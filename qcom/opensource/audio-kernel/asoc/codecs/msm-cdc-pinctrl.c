@@ -13,6 +13,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/pinctrl/qcom-pinctrl.h>
+#include <linux/pinctrl/consumer.h>
 #include <asoc/msm-cdc-pinctrl.h>
 
 #define MAX_GPIOS 16
