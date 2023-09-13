@@ -1087,7 +1087,7 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		}
 	} else if (strcmp(attr->attr.name, "r5_sbu2") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
@@ -1107,7 +1107,7 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		}
 	} else if (strcmp(attr->attr.name, "r6_sbu1") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
@@ -1127,7 +1127,7 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		}
 	} else if (strcmp(attr->attr.name, "r6_sbu2") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
@@ -1147,7 +1147,7 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		}
 	} else if (strcmp(attr->attr.name, "r7_sbu1") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
@@ -1167,7 +1167,7 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		}
 	} else if (strcmp(attr->attr.name, "r7_sbu2") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
@@ -1196,14 +1196,14 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		update_xtalk = true;
 	} else if (strcmp(attr->attr.name, "rcom_margin") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
 		usbcss_hs->gnd.r_common_gnd_margin = val;
 	} else if (strcmp(attr->attr.name, "se_slope_factor_times_1000") == 0) {
 		if (val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of HS impedance range %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of HS impedance range %d\n",
 			__func__, val, MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
 		}
