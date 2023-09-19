@@ -1729,7 +1729,7 @@ int cam_smmu_alloc_firmware(int32_t smmu_hdl,
 	 * But on chipsets which use dma-coherent - all the buffers that are
 	 * being mapped to this CB must be CACHED
 	 */
-	rc = iommu_map(domain,
+	rc = cam_iommu_map(domain,
 		firmware_start,
 		(phys_addr_t) icp_fw.fw_hdl,
 		firmware_len,
@@ -2027,7 +2027,7 @@ int cam_smmu_map_phy_mem_region(int32_t smmu_hdl,
 	 * But on chipsets which use dma-coherent - all the buffers that are
 	 * being mapped to this CB must be CACHED
 	 */
-	rc = iommu_map(domain, region_start, region_info->phy_addr, region_len, prot);
+	rc = cam_iommu_map(domain, region_start, region_info->phy_addr, region_len, prot);
 	if (rc) {
 		CAM_ERR(CAM_SMMU, "Failed to map region = %u into IOMMU cb = %s",
 			region_id, cb_info->name[0]);
@@ -2464,7 +2464,7 @@ int cam_smmu_reserve_buf_region(enum cam_smmu_region_id region,
 	if (iommu_cb_set.force_cache_allocs)
 		prot |= IOMMU_CACHE;
 
-	size = iommu_map_sg(cb_info->domain,
+	size = cam_iommu_map_sg(cb_info->domain,
 		region_info->iova_start,
 		buf_info->table->sgl,
 		buf_info->table->orig_nents,
@@ -2710,7 +2710,7 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 		if (iommu_cb_set.force_cache_allocs)
 			prot |= IOMMU_CACHE;
 
-		size = iommu_map_sg(domain, iova, table->sgl, table->orig_nents,
+		size = cam_iommu_map_sg(domain, iova, table->sgl, table->orig_nents,
 				prot);
 
 		if (size < 0) {
@@ -2723,7 +2723,7 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 			goto err_unmap_sg;
 		} else {
 			CAM_DBG(CAM_SMMU,
-				"iommu_map_sg returned iova=%pK, size=%zu",
+				"cam_iommu_map_sg returned iova=%pK, size=%zu",
 				iova, size);
 			*paddr_ptr = iova;
 			*len_ptr = size;
@@ -3284,12 +3284,12 @@ static int cam_smmu_alloc_scratch_buffer_add_to_list(int idx,
 	if (iommu_cb_set.force_cache_allocs)
 		iommu_dir |= IOMMU_CACHE;
 
-	if (iommu_map_sg(domain,
+	if (cam_iommu_map_sg(domain,
 		iova,
 		table->sgl,
 		table->nents,
 		iommu_dir) != virt_len) {
-		CAM_ERR(CAM_SMMU, "iommu_map_sg() failed");
+		CAM_ERR(CAM_SMMU, "cam_iommu_map_sg() failed");
 		goto err_iommu_map;
 	}
 
