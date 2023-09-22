@@ -7,8 +7,12 @@
 #include <linux/rpmsg.h>
 #include <linux/of_platform.h>
 #include <linux/of_fdt.h>
-#include <linux/qcom_scm.h>
 #include <soc/qcom/secure_buffer.h>
+#if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
+#include <linux/firmware/qcom/qcom_scm.h>
+#else
+#include <linux/qcom_scm.h>
+#endif
 #include "msm_cvp_core.h"
 #include "msm_cvp.h"
 #include "cvp_hfi.h"
