@@ -217,6 +217,7 @@ void adreno_coresight_remove(struct adreno_device *adreno_dev)
 		coresight_unregister(adreno_dev->cx_coresight.dev);
 }
 
+#if (KERNEL_VERSION(6, 1, 0) >= LINUX_VERSION_CODE)
 static int funnel_gfx_enable(struct coresight_device *csdev, int inport,
 			 int outport)
 {
@@ -265,10 +266,13 @@ static void funnel_gfx_disable(struct coresight_device *csdev, int inport,
 err:
 	mutex_unlock(&device->mutex);
 }
+#endif
 
 struct coresight_ops_link funnel_link_gfx_ops = {
+#if (KERNEL_VERSION(6, 1, 0) >= LINUX_VERSION_CODE)
 	.enable = funnel_gfx_enable,
 	.disable = funnel_gfx_disable,
+#endif
 };
 
 struct coresight_ops funnel_gfx_ops = {
