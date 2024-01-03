@@ -10,8 +10,13 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/mutex.h>
+
+#if 0
 #if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
 #include <msm_hw_fence.h>
+#else
+#include <linux/soc/qcom/msm_hw_fence.h>
+#endif
 #else
 #include <linux/soc/qcom/msm_hw_fence.h>
 #endif
