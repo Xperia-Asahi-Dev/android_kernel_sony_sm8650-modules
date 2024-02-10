@@ -2248,9 +2248,9 @@ static int tasha_get_iir_enable_audio_mixer(
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	/* IIR filter band registers are at integer multiples of 16 */
 	u16 iir_reg = WCD9335_CDC_SIDETONE_IIR0_IIR_CTL + 16 * iir_idx;
@@ -2270,12 +2270,12 @@ static int tasha_hph_impedance_get(struct snd_kcontrol *kcontrol,
 {
 	uint32_t zl, zr;
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
 	struct tasha_priv *priv = snd_soc_component_get_drvdata(component);
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 	wcd_mbhc_get_impedance(&priv->mbhc, &zl, &zr);
 	dev_dbg(component->dev, "%s: zl=%u(ohms), zr=%u(ohms)\n", __func__,
@@ -2347,8 +2347,8 @@ static int tasha_vi_feed_mixer_put(struct snd_kcontrol *kcontrol,
 			snd_soc_dapm_to_component(widget->dapm);
 	struct tasha_priv *tasha_p = snd_soc_component_get_drvdata(component);
 	struct wcd9xxx *core = tasha_p->wcd9xxx;
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 port_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
@@ -2414,8 +2414,8 @@ static int slim_tx_mixer_put(struct snd_kcontrol *kcontrol,
 	struct tasha_priv *tasha_p = snd_soc_component_get_drvdata(component);
 	struct wcd9xxx *core = dev_get_drvdata(component->dev->parent);
 	struct snd_soc_dapm_update *update = NULL;
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 port_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
@@ -2808,9 +2808,9 @@ static int tasha_put_iir_enable_audio_mixer(
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	bool iir_band_en_status;
 	int value = ucontrol->value.integer.value[0];
@@ -2879,9 +2879,9 @@ static int tasha_get_iir_band_audio_mixer(
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	ucontrol->value.integer.value[0] =
@@ -3464,9 +3464,9 @@ static int tasha_put_iir_band_audio_mixer(
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	/*
@@ -3512,7 +3512,7 @@ static int tasha_get_compander(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct tasha_priv *tasha = snd_soc_component_get_drvdata(component);
 
@@ -3526,7 +3526,7 @@ static int tasha_set_compander(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
 	struct tasha_priv *tasha = snd_soc_component_get_drvdata(component);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 
@@ -8153,7 +8153,7 @@ static int tasha_pinctl_mode_get(struct snd_kcontrol *kcontrol,
 	u16 ctl_reg;
 	u8 reg_val, pinctl_position;
 
-	pinctl_position = ((struct soc_multi_mixer_control *)
+	pinctl_position = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	switch (pinctl_position >> 3) {
 	case 0:
@@ -8192,7 +8192,7 @@ static int tasha_pinctl_mode_put(struct snd_kcontrol *kcontrol,
 
 	/* 1- high or low; 0- high Z */
 	pinctl_mode = ucontrol->value.integer.value[0];
-	pinctl_position = ((struct soc_multi_mixer_control *)
+	pinctl_position = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	switch (pinctl_position >> 3) {

@@ -1592,9 +1592,9 @@ static int rouleur_get_compander(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct rouleur_priv *rouleur = snd_soc_component_get_drvdata(component);
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 
 	ucontrol->value.integer.value[0] = hphr ? rouleur->comp2_enable :
@@ -1610,9 +1610,9 @@ static int rouleur_set_compander(struct snd_kcontrol *kcontrol,
 	struct rouleur_priv *rouleur = snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 	if (hphr)
 		rouleur->comp2_enable = value;

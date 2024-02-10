@@ -2122,7 +2122,7 @@ static int rx_macro_get_compander(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct device *rx_dev = NULL;
 	struct rx_macro_priv *rx_priv = NULL;
@@ -2139,7 +2139,7 @@ static int rx_macro_set_compander(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 	struct device *rx_dev = NULL;
@@ -2814,9 +2814,9 @@ static int rx_macro_iir_enable_audio_mixer_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	/* IIR filter band registers are at integer multiples of 0x80 */
 	u16 iir_reg = BOLERO_CDC_RX_SIDETONE_IIR0_IIR_CTL + 0x80 * iir_idx;
@@ -2836,9 +2836,9 @@ static int rx_macro_iir_enable_audio_mixer_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	bool iir_band_en_status = 0;
 	int value = ucontrol->value.integer.value[0];
@@ -2913,9 +2913,9 @@ static int rx_macro_iir_band_audio_mixer_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	ucontrol->value.integer.value[0] =
@@ -2974,9 +2974,9 @@ static int rx_macro_iir_band_audio_mixer_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	int coeff_idx, idx = 0;
 	struct device *rx_dev = NULL;

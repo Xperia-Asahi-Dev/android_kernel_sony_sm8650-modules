@@ -211,7 +211,7 @@ static int aqt_iir_enable_audio_mixer_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	ucontrol->value.integer.value[0] = (snd_soc_component_read32(component,
@@ -229,7 +229,7 @@ static int aqt_iir_enable_audio_mixer_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	bool iir_band_en_status;
 	int value = ucontrol->value.integer.value[0];
@@ -296,7 +296,7 @@ static int aqt_iir_band_audio_mixer_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	ucontrol->value.integer.value[0] =
@@ -355,7 +355,7 @@ static int aqt_iir_band_audio_mixer_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	int coeff_idx;
 
@@ -398,7 +398,7 @@ static int aqt_compander_get(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct aqt1000 *aqt = snd_soc_component_get_drvdata(component);
 
@@ -412,7 +412,7 @@ static int aqt_compander_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
 	struct aqt1000 *aqt = snd_soc_component_get_drvdata(component);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 
