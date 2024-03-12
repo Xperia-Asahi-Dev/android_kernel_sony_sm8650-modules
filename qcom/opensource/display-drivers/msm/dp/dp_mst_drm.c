@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
- * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2024, The Linux Foundation. All rights reserved.
  */
 
 /*
@@ -321,7 +321,11 @@ static int dp_mst_calc_pbn_mode(struct dp_display_mode *dp_mode)
 	dsc_en = pinfo->comp_info.enabled;
 	bpp = dsc_en ? DSC_BPP(pinfo->comp_info.dsc_info.config) : pinfo->bpp;
 
+#if (KERNEL_VERSION(6, 6, 17) <= LINUX_VERSION_CODE)
+	pbn = drm_dp_calc_pbn_mode(pinfo->pixel_clk_khz, bpp << 4);
+#else
 	pbn = drm_dp_calc_pbn_mode(pinfo->pixel_clk_khz, bpp, false);
+#endif
 	pbn_fp = drm_fixp_from_fraction(pbn, 1);
 	pinfo->pbn_no_overhead = pbn;
 
