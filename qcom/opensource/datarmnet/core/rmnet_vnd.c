@@ -25,7 +25,11 @@
 #include <linux/icmpv6.h>
 #include <linux/ethtool.h>
 #include <net/pkt_sched.h>
+#include <linux/version.h>
 #include <net/ipv6.h>
+#if (KERNEL_VERSION(6, 5, 0) <= LINUX_VERSION_CODE)
+#include <net/gso.h>
+#endif
 #include "rmnet_config.h"
 #include "rmnet_handlers.h"
 #include "rmnet_private.h"
@@ -277,12 +281,12 @@ static void rmnet_get_stats64(struct net_device *dev,
 		pcpu_ptr = per_cpu_ptr(priv->pcpu_stats, cpu);
 
 		do {
-			start = u64_stats_fetch_begin_irq(&pcpu_ptr->syncp);
+			start = u64_stats_fetch_begin(&pcpu_ptr->syncp);
 			total_stats.rx_pkts += pcpu_ptr->stats.rx_pkts;
 			total_stats.rx_bytes += pcpu_ptr->stats.rx_bytes;
 			total_stats.tx_pkts += pcpu_ptr->stats.tx_pkts;
 			total_stats.tx_bytes += pcpu_ptr->stats.tx_bytes;
-		} while (u64_stats_fetch_retry_irq(&pcpu_ptr->syncp, start));
+		} while (u64_stats_fetch_retry(&pcpu_ptr->syncp, start));
 
 		total_stats.tx_drops += pcpu_ptr->stats.tx_drops;
 	}
