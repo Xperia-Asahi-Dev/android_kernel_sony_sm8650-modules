@@ -797,7 +797,7 @@ int msm_audio_ssr_register(struct cdev *virt_sndcard_ctl)
 		pr_err("%s: Cannot add the device to the system\n", __func__);
 		goto err;
 	}
-	dev_class = class_create(THIS_MODULE, "SSR");
+	dev_class = class_create("SSR");
 	if (IS_ERR(dev_class)) {
 		pr_err("%s: Cannot create the struct class\n", __func__);
 		goto err;

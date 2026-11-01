@@ -5332,7 +5332,7 @@ int __init kgsl_core_init(void)
 		goto err;
 	}
 
-	kgsl_driver.class = class_create(THIS_MODULE, "kgsl");
+	kgsl_driver.class = class_create("kgsl");
 
 	if (IS_ERR(kgsl_driver.class)) {
 		result = PTR_ERR(kgsl_driver.class);

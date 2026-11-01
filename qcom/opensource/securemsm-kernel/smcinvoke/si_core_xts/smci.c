@@ -1671,7 +1671,7 @@ static int smcinvoke_probe(struct platform_device *pdev)
 #if  (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
 	driver_class = class_create(SMCI_DEVICE_NAME);
 #else
-	driver_class = class_create(THIS_MODULE, SMCI_DEVICE_NAME);
+	driver_class = class_create(SMCI_DEVICE_NAME);
 #endif
 	if (IS_ERR(driver_class)) {
 		ret = PTR_ERR(driver_class);

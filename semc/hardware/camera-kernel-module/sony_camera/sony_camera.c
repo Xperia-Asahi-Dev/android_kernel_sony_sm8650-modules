@@ -3779,7 +3779,7 @@ static int __init sony_camera_init_module(void)
 	}
 
 	/* create the node of device */
-	g_camera_device_class = class_create(THIS_MODULE, SONY_CAMERA_DEV_NAME);
+	g_camera_device_class = class_create(SONY_CAMERA_DEV_NAME);
 	if (IS_ERR(g_camera_device_class)) {
 		LOGE("class_create() failed.");
 		rc = PTR_ERR(g_camera_device_class);

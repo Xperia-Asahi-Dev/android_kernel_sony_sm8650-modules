@@ -9395,7 +9395,7 @@ static int qseecom_init_dev(struct platform_device *pdev)
 #if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
 	qseecom.driver_class = class_create(QSEECOM_DEV);
 #else
-	qseecom.driver_class = class_create(THIS_MODULE, QSEECOM_DEV);
+	qseecom.driver_class = class_create(QSEECOM_DEV);
 #endif
 	if (IS_ERR(qseecom.driver_class)) {
 		rc = PTR_ERR(qseecom.driver_class);

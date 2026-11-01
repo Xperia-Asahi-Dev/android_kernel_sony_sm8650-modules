@@ -1274,7 +1274,7 @@ int egisfp_probe(struct platform_device *pdev)
 		ERROR_PRINT(" %s : register_chrdev error \n", __func__);
 		return status;
 	}
-	egisfp_class = class_create(THIS_MODULE, EGIS_CLASS_NAME);
+	egisfp_class = class_create(EGIS_CLASS_NAME);
 	if (IS_ERR(egisfp_class))
 	{
 		ERROR_PRINT(" %s : class_create error \n", __func__);

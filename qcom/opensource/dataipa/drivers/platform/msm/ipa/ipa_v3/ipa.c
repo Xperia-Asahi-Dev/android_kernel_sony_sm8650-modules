@@ -9823,7 +9823,7 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	spin_lock_init(&ipa3_ctx->wc_memb.ipa_tx_mul_spinlock);
 	INIT_LIST_HEAD(&ipa3_ctx->wc_memb.wlan_comm_desc_list);
 
-	ipa3_ctx->cdev.class = class_create(THIS_MODULE, DRV_NAME);
+	ipa3_ctx->cdev.class = class_create(DRV_NAME);
 
 	result = alloc_chrdev_region(&ipa3_ctx->cdev.dev_num, 0, 1, DRV_NAME);
 	if (result) {

@@ -787,7 +787,7 @@ static int rmidev_create_device_class(void)
 	if (rmidev_device_class != NULL)
 		return 0;
 
-	rmidev_device_class = class_create(THIS_MODULE, DEVICE_CLASS_NAME);
+	rmidev_device_class = class_create(DEVICE_CLASS_NAME);
 
 	if (IS_ERR(rmidev_device_class)) {
 		pr_err("%s: Failed to create /dev/%s\n",

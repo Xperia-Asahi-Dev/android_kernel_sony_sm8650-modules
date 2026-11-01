@@ -2534,7 +2534,7 @@ static int qcedev_probe_device(struct platform_device *pdev)
 #if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
 	driver_class = class_create(QCEDEV_DEV);
 #else
-	driver_class = class_create(THIS_MODULE, QCEDEV_DEV);
+	driver_class = class_create(QCEDEV_DEV);
 #endif
 	if (IS_ERR(driver_class)) {
 		rc = -ENOMEM;

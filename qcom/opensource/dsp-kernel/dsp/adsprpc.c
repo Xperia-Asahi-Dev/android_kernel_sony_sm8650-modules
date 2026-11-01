@@ -9175,7 +9175,7 @@ static int __init fastrpc_device_init(void)
 				NUM_DEVICES));
 	if (err)
 		goto cdev_init_bail;
-	me->class = class_create(THIS_MODULE, "fastrpc");
+	me->class = class_create("fastrpc");
 	VERIFY(err, !IS_ERR(me->class));
 	if (err)
 		goto class_create_bail;

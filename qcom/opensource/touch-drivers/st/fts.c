@@ -5807,7 +5807,7 @@ static int fts_probe_internal(struct i2c_client *client,
 	}
 
 	/* I2C cmd */
-	fts_cmd_class = class_create(THIS_MODULE, FTS_TS_DRV_NAME);
+	fts_cmd_class = class_create(FTS_TS_DRV_NAME);
 
 #ifdef SCRIPTLESS
 	info->i2c_cmd_dev = device_create(fts_cmd_class,
@@ -5867,7 +5867,7 @@ static int fts_probe_internal(struct i2c_client *client,
 		goto ProbeErrorExit_11;
 	}
 
-	info->aoi_class = class_create(THIS_MODULE, "android_touch");
+	info->aoi_class = class_create("android_touch");
 	if (info->aoi_class) {
 		info->aoi_dev = device_create(info->aoi_class,
 			NULL, DCHIP_ID_0, info, "touch");

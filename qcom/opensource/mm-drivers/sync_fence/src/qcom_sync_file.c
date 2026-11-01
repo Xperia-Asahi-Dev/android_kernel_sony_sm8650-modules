@@ -491,7 +491,7 @@ static int spec_sync_register_device(void)
 	struct dummy_spec_fence *dummy_fence_p = NULL;
 	int ret;
 
-	sync_dev.dev_class = class_create(THIS_MODULE, CLASS_NAME);
+	sync_dev.dev_class = class_create(CLASS_NAME);
 	if (sync_dev.dev_class == NULL) {
 		pr_err("%s: class_create fail.\n", __func__);
 		goto res_err;

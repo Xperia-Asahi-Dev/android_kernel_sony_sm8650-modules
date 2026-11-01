@@ -2813,7 +2813,7 @@ static int ubwcp_cdev_init(struct ubwcp_driver *ubwcp)
 	}
 
 	/* create device class  (/sys/class/ubwcp_class) */
-	dev_class = class_create(THIS_MODULE, "ubwcp_class");
+	dev_class = class_create("ubwcp_class");
 	if (IS_ERR(dev_class)) {
 		ret = PTR_ERR(dev_class);
 		ERR("class_create() failed, ret: %d", ret);

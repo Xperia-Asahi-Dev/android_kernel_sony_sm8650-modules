@@ -3193,7 +3193,7 @@ static int somc_bcext_probe(struct platform_device *pdev)
 	bcext_dev->usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 
 	/* virtual device resistration */
-	bcext_dev->vcls = class_create(THIS_MODULE, "wlc_switch");
+	bcext_dev->vcls = class_create("wlc_switch");
 	if (IS_ERR(bcext_dev->vcls)) {
 		rc = PTR_ERR(bcext_dev->vcls);
 		bcext_err("Could not create class (rc=%d)\n", rc);

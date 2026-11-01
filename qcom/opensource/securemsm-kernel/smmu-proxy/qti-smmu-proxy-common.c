@@ -79,7 +79,7 @@ int smmu_proxy_create_dev(const struct file_operations *fops)
 #if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
 	smmu_proxy_class = class_create("qti-smmu-proxy");
 #else
-	smmu_proxy_class = class_create(THIS_MODULE, "qti-smmu-proxy");
+	smmu_proxy_class = class_create("qti-smmu-proxy");
 #endif
 	if (IS_ERR(smmu_proxy_class)) {
 		ret = PTR_ERR(smmu_proxy_class);
