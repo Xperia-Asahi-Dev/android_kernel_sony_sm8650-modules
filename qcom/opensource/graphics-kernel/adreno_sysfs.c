@@ -5,7 +5,10 @@
  */
 
 #include <linux/sysfs.h>
-#include <linux/qcom_scm.h>
+
+// Use upstream SCM header location - TODO - it may cause abi breakage
+// #include <linux/qcom_scm.h>
+#include <linux/firmware/qcom/qcom_scm.h>
 
 #include "adreno.h"
 #include "adreno_sysfs.h"
