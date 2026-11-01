@@ -8,6 +8,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_fdt.h>
 #include <soc/qcom/secure_buffer.h>
+#include <linux/version.h>
 #if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
 #include <linux/firmware/qcom/qcom_scm.h>
 #else
