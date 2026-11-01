@@ -1187,7 +1187,7 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		}
 	} else if (strcmp(attr->attr.name, "r_common_gnd_offset") == 0) {
 		if (val < -MAX_USBCSS_HS_IMPEDANCE_MOHMS || val > MAX_USBCSS_HS_IMPEDANCE_MOHMS) {
-			dev_err(wcd939x->dev, "%s: Value %d out of bounds. Min: %d, Max: %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of bounds. Min: %d, Max: %d\n",
 			__func__, val, -MAX_USBCSS_HS_IMPEDANCE_MOHMS,
 			MAX_USBCSS_HS_IMPEDANCE_MOHMS);
 			return count;
@@ -1210,14 +1210,14 @@ static ssize_t usbcss_sysfs_store(struct kobject *kobj, struct kobj_attribute *a
 		usbcss_hs->se_slope_factor_times_1000 = val;
 	} else if (strcmp(attr->attr.name, "diff_slope_factor_times_1000") == 0) {
 		if (val > MAX_DIFF_SLOPE_FACTOR || val < MIN_DIFF_SLOPE_FACTOR) {
-			dev_err(wcd939x->dev, "%s: Value %d out of range of %d to %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of range of %d to %d\n",
 			__func__, val, MIN_DIFF_SLOPE_FACTOR, MAX_DIFF_SLOPE_FACTOR);
 			return count;
 		}
 		usbcss_hs->diff_slope_factor_times_1000 = val;
 	} else if (strcmp(attr->attr.name, "lin_k_aud") == 0) {
 		if (val < MIN_K_TIMES_100 || val > MAX_K_TIMES_100) {
-			dev_err(wcd939x->dev, "%s: Value %d out of bounds. Min: %d, Max: %d\n",
+			dev_err(wcd939x->dev, "%s: Value %ld out of bounds. Min: %d, Max: %d\n",
 			__func__, val, MIN_K_TIMES_100, MAX_K_TIMES_100);
 			return count;
 		}

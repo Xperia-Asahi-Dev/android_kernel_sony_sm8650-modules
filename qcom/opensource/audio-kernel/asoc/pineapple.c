@@ -35,12 +35,10 @@
 #include "device_event.h"
 #include "asoc/msm-cdc-pinctrl.h"
 #include "asoc/wcd-mbhc-v2.h"
-#include "codecs/wcd937x/wcd937x-mbhc.h"
 #include "codecs/wcd9378/wcd9378-mbhc.h"
 #include "codecs/wcd939x/wcd939x-mbhc.h"
 #include "codecs/wsa884x/wsa884x.h"
 #include "codecs/wsa883x/wsa883x.h"
-#include "codecs/wcd937x/wcd937x.h"
 #include "codecs/wcd9378/wcd9378.h"
 #include "codecs/wcd939x/wcd939x.h"
 #include "codecs/lpass-cdc/lpass-cdc.h"
@@ -79,7 +77,6 @@
 #define MAX_NAME_LEN	40
 
 enum {
-	WCD937X_DEV_INDEX,
 	WCD939X_DEV_INDEX,
 	WCD9378_DEV_INDEX,
 };
@@ -260,9 +257,7 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 			return;
 		}
 	} else {
-		if (pdata->wcd_used == WCD937X_DEV_INDEX)
-			strscpy(wcd_name, WCD937X_DRV_NAME, sizeof(WCD937X_DRV_NAME));
-		else if (pdata->wcd_used == WCD9378_DEV_INDEX)
+		if (pdata->wcd_used == WCD9378_DEV_INDEX)
 			strscpy(wcd_name, WCD9378_DRV_NAME, sizeof(WCD9378_DRV_NAME));
 		else
 			strscpy(wcd_name, WCD939X_DRV_NAME, sizeof(WCD939X_DRV_NAME));
@@ -280,9 +275,7 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 		else
 			pdata->get_dev_num = wsa884x_codec_get_dev_num;
 	} else {
-		if (pdata->wcd_used == WCD937X_DEV_INDEX) {
-			pdata->get_dev_num = wcd937x_codec_get_dev_num;
-		} else if (pdata->wcd_used == WCD9378_DEV_INDEX) {
+		if (pdata->wcd_used == WCD9378_DEV_INDEX) {
 			pdata->get_dev_num = wcd9378_codec_get_dev_num;
 		} else {
 			pdata->get_dev_num = wcd939x_codec_get_dev_num;
@@ -1699,9 +1692,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 		return -EINVAL;
 	}
 
-	if (pdata->wcd_used == WCD937X_DEV_INDEX)
-		strscpy(wcd_name, WCD937X_DRV_NAME, sizeof(WCD937X_DRV_NAME));
-	else if (pdata->wcd_used == WCD9378_DEV_INDEX)
+	if (pdata->wcd_used == WCD9378_DEV_INDEX)
 		strscpy(wcd_name, WCD9378_DRV_NAME, sizeof(WCD9378_DRV_NAME));
 	else
 		strscpy(wcd_name, WCD939X_DRV_NAME, sizeof(WCD939X_DRV_NAME));
@@ -1724,9 +1715,6 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 #endif
 
 	switch (pdata->wcd_used) {
-	case WCD937X_DEV_INDEX:
-		ret = wcd937x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
-		break;
 	case WCD9378_DEV_INDEX:
 		ret = wcd9378_mbhc_hs_detect(component, &wcd_mbhc_cfg);
 		break;
@@ -2410,18 +2398,13 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD939X_DRV_NAME);
 	if (!component) {
-		component = snd_soc_rtdcom_lookup(rtd, WCD937X_DRV_NAME);
+		component = snd_soc_rtdcom_lookup(rtd, WCD9378_DRV_NAME);
 		if (!component) {
-			component = snd_soc_rtdcom_lookup(rtd, WCD9378_DRV_NAME);
-			if (!component) {
-				pr_err("%s component is NULL\n", __func__);
-				ret = -EINVAL;
-				goto exit;
-			} else {
-				pdata->wcd_used = WCD9378_DEV_INDEX;
-			}
+			pr_err("%s component is NULL\n", __func__);
+			ret = -EINVAL;
+			goto exit;
 		} else {
-			pdata->wcd_used = WCD937X_DEV_INDEX;
+			pdata->wcd_used = WCD9378_DEV_INDEX;
 		}
 	} else {
 		pdata->wcd_used = WCD939X_DEV_INDEX;
@@ -2452,11 +2435,7 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 		}
 		pdata->codec_root = entry;
 	}
-	if (pdata->wcd_used == WCD937X_DEV_INDEX) {
-		wcd937x_info_create_codec_entry(pdata->codec_root, component);
-		codec_variant = wcd937x_get_codec_variant(component);
-		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
-	} else if (pdata->wcd_used == WCD9378_DEV_INDEX) {
+	if (pdata->wcd_used == WCD9378_DEV_INDEX) {
 		wcd9378_info_create_codec_entry(pdata->codec_root, component);
 	} else {
 		wcd939x_info_create_codec_entry(pdata->codec_root, component);
