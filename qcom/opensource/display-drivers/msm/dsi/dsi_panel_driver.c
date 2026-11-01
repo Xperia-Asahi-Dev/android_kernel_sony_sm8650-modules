@@ -1507,7 +1507,7 @@ static ssize_t dsi_panel_driver_area_count_show(struct device *dev,
 
 	memset(area_count_str, 0, sizeof(char) * DSI_BUF_SIZE);
 	for (i = 0; i < spec_pdata->area_count_table_size; i++) {
-		pr_debug("%ld, ", spec_pdata->area_count[i]);
+		pr_debug("%u, ", spec_pdata->area_count[i]);
 		memset(count_data, 0, sizeof(char) * BR_MAX_FIGURE);
 		if (spec_pdata->area_count[i] > AREA_COUNT_MAX) {
 			/* over 167 min */
@@ -1515,11 +1515,11 @@ static ssize_t dsi_panel_driver_area_count_show(struct device *dev,
 		}
 		if (i == 0) {
 			snprintf(count_data, BR_MAX_FIGURE,
-				"%ld", spec_pdata->area_count[i]);
+				"%u", spec_pdata->area_count[i]);
 			strlcpy(area_count_str, count_data, DSI_BUF_SIZE);
 		} else {
 			snprintf(count_data, BR_MAX_FIGURE,
-				",%ld", spec_pdata->area_count[i]);
+				",%u", spec_pdata->area_count[i]);
 			strlcat(area_count_str, count_data, DSI_BUF_SIZE);
 		}
 	}

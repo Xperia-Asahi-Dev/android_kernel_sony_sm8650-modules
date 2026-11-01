@@ -1194,7 +1194,8 @@ static int _sde_encoder_phys_wb_validate_output_fmt(struct sde_encoder_phys *phy
 		return ret;
 	} else if (fmt->chroma_sample == SDE_CHROMA_H2V1 || fmt->chroma_sample == SDE_CHROMA_H1V2) {
 		SDE_ERROR("[enc:%d wb:%d] invalid output pixel format:0x%x mod:0x%llx\n",
-			DRMID(phys_enc->parent), WBID(wb_enc), fmt->base.pixel_format);
+			DRMID(phys_enc->parent), WBID(wb_enc), fmt->base.pixel_format,
+			fb->modifier);
 		return -EINVAL;
 	} else if (SDE_FORMAT_IS_UBWC(fmt) && !(wb_cfg->features & BIT(SDE_WB_UBWC))) {
 		SDE_ERROR("[enc:%d wb:%d] invalid output format:%x\n",
@@ -1278,7 +1279,7 @@ static int sde_encoder_phys_wb_atomic_check(struct sde_encoder_phys *phys_enc,
 
 	fmt = sde_get_sde_format_ext(fb->format->format, fb->modifier);
 	if (!fmt) {
-		SDE_ERROR("[enc:%d wb:%d] invalid output pixel format:0x%x mod:0x%x\n",
+		SDE_ERROR("[enc:%d wb:%d] invalid output pixel format:0x%x mod:0x%llx\n",
 				DRMID(phys_enc->parent), WBID(wb_enc),
 				fb->format->format, fb->modifier);
 		return -EINVAL;
