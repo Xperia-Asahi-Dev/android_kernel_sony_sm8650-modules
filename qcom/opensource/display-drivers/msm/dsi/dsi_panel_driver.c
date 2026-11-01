@@ -17,6 +17,11 @@
 #include <linux/notifier.h>
 #include <linux/export.h>
 #include <linux/drm_notify.h>
+#include <linux/version.h>
+#if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
+#include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/pinctrl.h>
+#endif
 #include "dsi_panel_driver.h"
 #include "dsi_panel.h"
 #include "dsi_display.h"
