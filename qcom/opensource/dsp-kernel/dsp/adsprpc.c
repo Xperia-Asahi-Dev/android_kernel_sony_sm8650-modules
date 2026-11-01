@@ -57,6 +57,7 @@
 #include <asm/arch_timer.h>
 #include <linux/genalloc.h>
 #include <soc/qcom/socinfo.h>
+#include <linux/version.h>
 
 #ifdef CONFIG_HIBERNATION
 #include <linux/suspend.h>
@@ -5776,7 +5777,7 @@ int fastrpc_internal_mmap(struct fastrpc_file *fl,
 		}
 		dma_attr = DMA_ATTR_DELAYED_UNMAP | DMA_ATTR_NO_KERNEL_MAPPING;
 		if (ud->flags == ADSP_MMAP_ADD_PAGES_LLC)
-			dma_attr |= DMA_ATTR_SYS_CACHE_ONLY;
+			dma_attr |= DMA_ATTR_SYS_CACHE;
 		err = fastrpc_buf_alloc(fl, ud->size, dma_attr, ud->flags,
 						USERHEAP_BUF, &rbuf);
 		if (err)
@@ -8323,8 +8324,13 @@ static int fastrpc_cb_probe(struct device *dev)
 			goto iommu_map_bail;
 		}
 		/* Map the allocated memory with fixed IOVA and is shared to remote subsystem */
+#if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
+		err = iommu_map_sg(domain, frpc_gen_addr_pool[0], sgt.sgl,
+					sgt.nents, IOMMU_READ | IOMMU_WRITE | IOMMU_CACHE, GFP_KERNEL);
+#else
 		err = iommu_map_sg(domain, frpc_gen_addr_pool[0], sgt.sgl,
 					sgt.nents, IOMMU_READ | IOMMU_WRITE | IOMMU_CACHE);
+#endif
 		if (err < 0) {
 			ADSPRPC_ERR("iommu_map_sg failed with err %d", err);
 			goto iommu_map_bail;
