@@ -31,7 +31,9 @@ KBUILD_EXTRA := \
     WLAN_PROFILE=$(LOCAL_DEV_NAME) \
     DYNAMIC_SINGLE_CHIP=$(LOCAL_DEV_NAME) \
     MODNAME=$(WLAN_CHIPSET)_$(LOCAL_DEV_NAME) \
-    DEVNAME=$(LOCAL_DEV_NAME)
+    DEVNAME=$(LOCAL_DEV_NAME) \
+    WLAN_PROFILE=kiwi_v2 \
+    MODNAME=qca_cld3_kiwi_v2
 
 KBUILD_OPTIONS += \
     KBUILD_EXTRA_SYMBOLS=$(M)/../../../dataipa/drivers/platform/msm/Module.symvers \
