@@ -1718,7 +1718,7 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 		plat_data->reset_pin = -1;
 		t_dev_info(ts->dev, "of gpio  : reset-gpio ignored\n");
 	} else {
-		pin_val = of_get_named_gpio_flags(np, "reset-gpio", 0, NULL);
+		pin_val = of_get_named_gpio(np, "reset-gpio", 0);
 		if (!gpio_is_valid(pin_val)) {
 			t_dev_err(ts->dev, "of gpio  : reset-gpio invalid, %d\n", pin_val);
 			return -EINVAL;
@@ -1727,7 +1727,7 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 		plat_data->reset_pin = pin_val;
 	}
 
-	pin_val = of_get_named_gpio_flags(np, "irq-gpio", 0, NULL);
+	pin_val = of_get_named_gpio(np, "irq-gpio", 0);
 	if (!gpio_is_valid(pin_val)) {
 		t_dev_err(ts->dev, "of gpio  : irq-gpio invalid, %d\n", pin_val);
 		return -EINVAL;
