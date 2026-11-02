@@ -1,8 +1,10 @@
 /*
- * SPDX-License-Identifier: GPL-2.0
- *
- * lxs_ts.c
- *
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2024 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+// SPDX-License-Identifier: GPL-2.0
+/*
  * LXS touch core layer
  *
  * This program is free software; you can redistribute it and/or modify
@@ -11,33 +13,62 @@
  */
 
 #include "lxs_ts.h"
-
+#include <linux/soc/qcom/panel_event_notifier.h>
+#include <drm/drm_panel.h>
 u32 t_pr_dbg_mask;
-u32 t_dev_dbg_mask = DBG_NONE;
+u32 t_dev_dbg_mask = DBG_EVENT;
 u32 t_bus_dbg_mask;
 
 /* usage
  * (1) echo <value> > /sys/module/{Touch Module Name}/parameters/pr_dbg_mask
  * (2) insmod {Touch Module Name}.ko pr_dbg_mask=<value>
  */
-module_param_named(pr_dbg_mask, t_pr_dbg_mask, uint, S_IRUGO|S_IWUSR|S_IWGRP);
+module_param_named(pr_dbg_mask, t_pr_dbg_mask, uint, 0664);
 
 /* usage
  * (1) echo <value> > /sys/module/{Touch Module Name}/parameters/dev_dbg_mask
  * (2) insmod {Touch Module Name}.ko dev_dbg_mask=<value>
  */
-module_param_named(dev_dbg_mask, t_dev_dbg_mask, uint, S_IRUGO|S_IWUSR|S_IWGRP);
+module_param_named(dev_dbg_mask, t_dev_dbg_mask, uint, 0664);
 
 /* usage
  * (1) echo <value> > /sys/module/{Touch Module Name}/parameters/bus_dbg_mask
  * (2) insmod {Touch Module Name}.ko bus_dbg_mask=<value>
  */
-module_param_named(bus_dbg_mask, t_bus_dbg_mask, uint, S_IRUGO|S_IWUSR|S_IWGRP);
+module_param_named(bus_dbg_mask, t_bus_dbg_mask, uint, 0664);
 
-static void lxs_ts_options(struct lxs_ts *ts)
+void lxs_ts_options(struct lxs_ts *ts)
 {
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
+	t_dev_info(ts->dev, "build opt  : __SOMC_CUSTOM_POWER_CTRL\n");
+#endif
+
+#if defined(__SOMC_CUSTOM_DRM_NOTIF)
+	t_dev_info(ts->dev, "build opt  : __SOMC_CUSTOM_DRM_NOTIF\n");
+#endif
+
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
+	t_dev_info(ts->dev, "build opt  : __SOMC_CUSTOM_AFTER_PROBE\n");
+#endif
+
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
+	t_dev_info(ts->dev, "build opt  : __SOMC_CUSTOM_INPUT_CTRL\n");
+#endif
+
+#if defined(__LXS_CONFIG_INPUT_ANDROID)
+	t_dev_info(ts->dev, "build opt  : __LXS_CONFIG_INPUT_ANDROID\n");
+#endif
+
+#if defined(__LXS_SUPPORT_ADJ_INPUT)
+	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_ADJ_INPUT\n");
+#endif
+
 #if defined(__LXS_SUPPORT_PINCTRL)
 	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_PINCTRL\n");
+#endif
+
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_POWER_SUPPLY\n");
 #endif
 
 #if defined(__LXS_CONFIG_FB)
@@ -56,13 +87,18 @@ static void lxs_ts_options(struct lxs_ts *ts)
 	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_SLEEP\n");
 #endif
 
+#if defined(__LXS_SUPPORT_ABT)
+	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_ABT\n");
+#endif
+
+#if defined(__LXS_SUPPORT_DISP_FRAME_RATE)
+	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_DISP_FRAME_RATE\n");
+#endif
+
 #if defined(__LXS_SUPPORT_WATCHDOG)
 	t_dev_info(ts->dev, "build opt  : __LXS_SUPPORT_WATCHDOG\n");
 #endif
 }
-
-static int drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
-
 static void lxs_ts_params(struct lxs_ts *ts)
 {
 	lxs_ts_options(ts);
@@ -73,9 +109,18 @@ static void lxs_ts_params(struct lxs_ts *ts)
 	t_dev_info(ts->dev, "drv name   : %s\n", LXS_TS_NAME);
 
 	if (ts->idx)
-		snprintf(ts->input_name, sizeof(ts->input_name), "%s%d", LXS_TS_INPUT, ts->idx);
+		snprintf(ts->input_node_name, sizeof(ts->input_node_name), "%s%d", LXS_TS_INPUT, ts->idx);
 	else
-		strlcpy(ts->input_name, LXS_TS_INPUT, sizeof(ts->input_name));
+		strlcpy(ts->input_node_name, LXS_TS_INPUT, sizeof(ts->input_node_name));
+	t_dev_info(ts->dev, "input node : %s\n", ts->input_node_name);
+
+	snprintf(ts->input_node_phys, sizeof(ts->input_node_phys),
+		"%s/%s/%s", dev_name(ts->dev->parent), dev_name(ts->dev), ts->input_node_name);
+
+	if (ts->idx)
+		snprintf(ts->input_name, sizeof(ts->input_name), "%s%d", LXS_TS_FINGER, ts->idx);
+	else
+		strlcpy(ts->input_name, LXS_TS_FINGER, sizeof(ts->input_name));
 	t_dev_info(ts->dev, "input name : %s\n", ts->input_name);
 
 	snprintf(ts->input_phys, sizeof(ts->input_phys),
@@ -91,7 +136,364 @@ static void lxs_ts_params(struct lxs_ts *ts)
 	t_dev_info(ts->dev, "rx_dummy   : %d\n", ts->bus_rx_dummy_size);
 }
 
-#if defined(__LXS_CONFIG_FB)
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+#define PSY_DETECT_BATT		BIT(0)
+#define PSY_DETECT_USB		BIT(1)
+#define PSY_DETECT_OTG		BIT(2)
+#define PSY_DETECT_WIRELESS	BIT(3)
+
+#define PSY_NAME_BATT		"battery"
+#define PSY_NAME_USB		"usb"
+#define PSY_NAME_OTG		"otg"
+#define PSY_NAME_WIRELESS	"wireless"
+
+static int lxs_ts_psy_skip(struct lxs_ts *ts, char *title)
+{
+	if (ts->state_core != TS_CORE_NORMAL)
+		return 1;
+
+	return lxs_hal_access_not_allowed(ts, title, 0);
+}
+
+static void lxs_ts_psy_work(struct work_struct *work)
+{
+	struct lxs_ts *ts = container_of(work, struct lxs_ts, psy_work.work);
+	union power_supply_propval val;
+	int capa_batt, online_usb, online_otg, online_wireless;
+	int changed = 0;
+
+	if (ts->shutdown_called)
+		return;
+
+	lxs_ts_psy_get(ts, ts->psy_batt, PSY_NAME_BATT, PSY_DETECT_BATT);
+
+	lxs_ts_psy_get(ts, ts->psy_usb, PSY_NAME_USB, PSY_DETECT_USB);
+
+	if (!(ts->psy_detect & (PSY_DETECT_BATT|PSY_DETECT_USB)))
+		return;
+
+	lxs_ts_psy_get(ts, ts->psy_otg, PSY_NAME_OTG, PSY_DETECT_OTG);
+
+	lxs_ts_psy_get(ts, ts->psy_wireless, PSY_NAME_WIRELESS, PSY_DETECT_WIRELESS);
+
+	lxs_ts_psy_property(ts, ts->psy_batt, get, POWER_SUPPLY_PROP_CAPACITY, val);
+	capa_batt = val.intval;
+
+	lxs_ts_psy_property(ts, ts->psy_usb, get, POWER_SUPPLY_PROP_ONLINE, val);
+	online_usb = val.intval;
+
+	lxs_ts_psy_property(ts, ts->psy_otg, get, POWER_SUPPLY_PROP_ONLINE, val);
+	online_otg = val.intval;
+
+	lxs_ts_psy_property(ts, ts->psy_wireless, get, POWER_SUPPLY_PROP_ONLINE, val);
+	online_wireless = val.intval;
+
+	if ((capa_batt < 0) || (online_usb < 0))
+		return;
+
+	if (ts->psy_detect & PSY_DETECT_OTG)
+		online_usb = (online_otg > 0) ? 0 : online_usb;
+
+	mutex_lock(&ts->lock);
+
+	t_dev_info(ts->dev, "%s: battery %d%%, usb %d, wireless %d\n",
+		__func__, capa_batt, online_usb, online_wireless);
+
+	online_usb = !!online_usb;
+	online_wireless = !!online_wireless;
+
+	changed |= (ts->state_connect != online_usb);
+	ts->state_connect = online_usb;
+
+	if (ts->psy_detect & PSY_DETECT_WIRELESS) {
+		changed |= (ts->state_wireless != online_wireless)<<1;
+		ts->state_wireless = online_wireless;
+	}
+
+	if (!changed || lxs_ts_psy_skip(ts, (char *)__func__))
+		goto out;
+
+	t_dev_info(ts->dev, "%s: USB conn %d\n", __func__, ts->state_connect);
+
+	if (ts->psy_detect & PSY_DETECT_WIRELESS)
+		t_dev_info(ts->dev, "%s: Wireless %d\n", __func__, ts->state_wireless);
+
+	lxs_hal_connect(ts);
+
+out:
+	mutex_unlock(&ts->lock);
+}
+
+static int lxs_ts_psy_noti(struct notifier_block *nb, unsigned long evt, void *ptr)
+{
+	struct lxs_ts *ts = container_of(nb, struct lxs_ts, psy_notifier);
+	struct power_supply *psy_noti = ptr;
+
+	if (!psy_noti)
+		return 0;
+
+	t_dev_dbg_base(ts->dev, "%s: %s\n", __func__, psy_noti->desc->name);
+
+	if (ts->shutdown_called)
+		return 0;
+
+	if (evt != PSY_EVENT_PROP_CHANGED)
+		return 0;
+
+	mod_delayed_work(ts->wq, &ts->psy_work, msecs_to_jiffies(100));
+
+	return 0;
+}
+
+static int lxs_ts_psy_notifier_init(struct lxs_ts *ts)
+{
+	int ret = 0;
+
+	ts->psy_detect = 0;
+
+	INIT_DELAYED_WORK(&ts->psy_work, lxs_ts_psy_work);
+
+	ts->psy_notifier.notifier_call = lxs_ts_psy_noti;
+	ret = power_supply_reg_notifier(&ts->psy_notifier);
+	if (ret < 0) {
+		ts->psy_notifier.notifier_call = NULL;
+		t_dev_err(ts->dev, "failed to register power supply notifier, %d\n", ret);
+		return ret;
+	}
+
+	t_dev_info(ts->dev, "init power supply notifier\n");
+
+	lxs_ts_psy_work(&ts->psy_work.work);
+
+	return 0;
+}
+
+static void lxs_ts_psy_notifier_free(struct lxs_ts *ts)
+{
+	if (ts->psy_notifier.notifier_call == NULL)
+		return;
+
+	cancel_delayed_work_sync(&ts->psy_work);
+
+	power_supply_unreg_notifier(&ts->psy_notifier);
+	ts->psy_notifier.notifier_call = NULL;
+
+	ts->psy_detect = 0;
+
+	if (ts->psy_batt)
+		power_supply_put(ts->psy_batt);
+
+	if (ts->psy_usb)
+		power_supply_put(ts->psy_usb);
+
+	if (ts->psy_otg)
+		power_supply_put(ts->psy_otg);
+
+	if (ts->psy_wireless)
+		power_supply_put(ts->psy_wireless);
+
+	ts->psy_batt = NULL;
+	ts->psy_usb = NULL;
+	ts->psy_otg = NULL;
+	ts->psy_wireless = NULL;
+
+	t_dev_info(ts->dev, "free power supply notifier\n");
+}
+#endif	/* __LXS_SUPPORT_POWER_SUPPLY */
+
+static int __used lxs_ts_suspend(struct lxs_ts *ts)
+{
+	int ret = 0;
+	int t;
+
+	t_dev_info(ts->dev, "%s: start\n", __func__);
+
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
+	if (!ts->probe_done && ts->after_probe.err) {
+		t_dev_err(ts->dev, "%s: probe failed. Do after_probe\n", __func__);
+	//	queue_delayed_work(ts->wq, &ts->after_probe.start, 0);
+		return 0;
+	}
+#else
+	if (!ts->probe_done) {
+		t_dev_err(ts->dev, "%s: probe failed\n", __func__);
+		return 0;
+	}
+#endif
+
+	t = wait_event_timeout(ts->resume_async_wait_q,
+			(ts->resume_async_flag == false), msecs_to_jiffies(3000));
+	if (!t) {
+		t_dev_err(ts->dev, "%s: resume_async timeout end\n", __func__);
+		return -ETIMEDOUT;
+	}
+
+	cancel_delayed_work_sync(&ts->sys_reset_work);
+	cancel_delayed_work_sync(&ts->init_work);
+
+	ret = lxs_hal_touch_mode(ts, TS_MODE_SUSPEND);
+	if (ret)
+		t_dev_err(ts->dev, "%s: failed touch_mode(suspend), %d\n", __func__, ret);
+
+	t_dev_info(ts->dev, "%s: end\n", __func__);
+
+	return 0;
+}
+
+static int __used lxs_ts_resume(struct lxs_ts *ts)
+{
+	int ret = 0;
+
+	t_dev_info(ts->dev, "%s: start\n", __func__);
+
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
+	if (!ts->probe_done && ts->after_probe.err) {
+		t_dev_err(ts->dev, "%s: probe failed. Do after_probe\n", __func__);
+		queue_delayed_work(ts->wq, &ts->after_probe.start, 0);
+		return 0;
+	}
+#else
+	if (!ts->probe_done) {
+		t_dev_err(ts->dev, "%s: probe failed\n", __func__);
+		return 0;
+	}
+#endif
+
+	ret = lxs_hal_touch_mode(ts, TS_MODE_RESUME);
+	if (ret)
+		t_dev_err(ts->dev, "%s: failed touch_mode(resume), %d\n", __func__, ret);
+
+	t_dev_info(ts->dev, "%s: end\n", __func__);
+
+	return 0;
+}
+
+static void lxs_ts_resume_async_work(struct work_struct *work)
+{
+	struct lxs_ts *ts = container_of(work, struct lxs_ts, resume_async_work);
+
+	t_dev_info(ts->dev, "%s: start.\n", __func__);
+
+	lxs_ts_resume(ts);
+
+	ts->resume_async_flag = false;
+	wake_up(&ts->resume_async_wait_q);
+
+	t_dev_info(ts->dev, "%s: end.\n", __func__);
+}
+
+static int __used lxs_ts_resume_async(struct lxs_ts *ts)
+{
+	if (ts->resume_async) {
+		if (ts->resume_async_flag)
+			return 0;
+
+		ts->resume_async_flag = true;
+		schedule_work(&ts->resume_async_work);
+		return 0;
+	}
+
+	return lxs_ts_resume(ts);
+}
+
+#if defined(__SOMC_CUSTOM_DRM_NOTIF)
+static void lxs_panel_notifier_callback(enum panel_event_notifier_tag tag,
+		 struct panel_event_notification *notification, void *client_data)
+{
+	struct lxs_ts *ts = client_data;
+	if (!notification) {
+		pr_err("Invalid notification\n");
+		return;
+	}
+	printk("Notification type:%d, early_trigger:%d",
+			notification->notif_type,
+			notification->notif_data.early_trigger);
+	switch (notification->notif_type) {
+	case DRM_PANEL_EVENT_UNBLANK:
+		if (!notification->notif_data.early_trigger)
+			lxs_ts_resume(ts);
+		break;
+	case DRM_PANEL_EVENT_BLANK:
+		if (notification->notif_data.early_trigger)
+			lxs_ts_suspend(ts);
+		break;
+	case DRM_PANEL_EVENT_BLANK_LP:
+		printk("received lp event\n");
+		break;
+	case DRM_PANEL_EVENT_FPS_CHANGE:
+		printk("Received fps change old fps:%d new fps:%d\n",
+				notification->notif_data.old_fps,
+				notification->notif_data.new_fps);
+		break;
+	default:
+		printk("notification serviced :%d\n",
+				notification->notif_type);
+		break;
+	}
+}
+static struct drm_panel *active_panel;
+static void lxs_register_for_panel_events(struct device_node *dp,
+					struct lxs_ts *ts)
+{
+	void *cookie;
+	cookie = panel_event_notifier_register(PANEL_EVENT_NOTIFICATION_PRIMARY,
+			PANEL_EVENT_NOTIFIER_CLIENT_PRIMARY_TOUCH, active_panel,
+			&lxs_panel_notifier_callback, ts);
+
+	if (!cookie) {
+		pr_err("Failed to register for panel events %ld\n",  PTR_ERR(cookie) );
+		return;
+	}
+	printk("Registered for panel notifications panel: %s\n",
+			active_panel->dev->of_node->name);
+	ts->notifier_cookie = cookie;
+}
+static int check_dt(struct device_node *np)
+{
+	int i;
+	int count;
+	struct device_node *node;
+	struct drm_panel *panel;
+
+	count = of_count_phandle_with_args(np, "panel", NULL);
+	if (count <= 0)
+		return 0;
+
+	for (i = 0; i < count; i++) {
+		node = of_parse_phandle(np, "panel", i);
+		panel = of_drm_find_panel(node);
+		of_node_put(node);
+		if (!IS_ERR(panel)) {
+			active_panel = panel;
+			return 0;
+		}
+	}
+
+	return PTR_ERR(panel);
+}
+/*
+static inline int lxs_ts_init_pm(struct lxs_ts *ts)
+{
+	int ret = 0;
+
+	t_dev_info(ts->dev, "init drm_notif\n");
+
+	ts->drm_notif.notifier_call = drm_notifier_callback;
+
+	ret = drm_register_client(&ts->drm_notif);
+	if (ret)
+		t_dev_err(ts->dev, "Unable to register drm_notifier: %d\n", ret);
+
+	return ret;
+}
+
+static inline void lxs_ts_free_pm(struct lxs_ts *ts)
+{
+	t_dev_info(ts->dev, "free drm_notif\n");
+
+	drm_unregister_client(&ts->drm_notif);
+}*/
+#elif defined(__LXS_CONFIG_FB)
 static int lxs_ts_fb_notifier_cb(
 			struct notifier_block *self,
 			unsigned long event, void *data)
@@ -126,9 +528,11 @@ static int lxs_ts_fb_notifier_cb(
 		switch (blank) {
 		case FB_BLANK_UNBLANK:
 			t_dev_info(ts->dev, "fb_unblank(early)\n");
+			lxs_ts_irq_control(ts, 0);
 			break;
 		case FB_BLANK_POWERDOWN:
 			t_dev_info(ts->dev, "fb_blank(early)\n");
+			lxs_ts_suspend(ts);
 			break;
 		}
 		return 0;
@@ -138,9 +542,11 @@ static int lxs_ts_fb_notifier_cb(
 		switch (blank) {
 		case FB_BLANK_UNBLANK:
 			t_dev_info(ts->dev, "fb_unblank\n");
+			lxs_ts_resume_async(ts);
 			break;
 		case FB_BLANK_POWERDOWN:
 			t_dev_info(ts->dev, "fb_blank\n");
+			lxs_ts_release_all_event(ts);
 			break;
 		}
 		return 0;
@@ -174,8 +580,6 @@ static inline void lxs_ts_free_pm(struct lxs_ts *ts)
 
 }
 #endif
-
-#define TS_LOCATION_DETECT_SIZE	6
 
 static void location_detect(struct lxs_ts *ts, char *loc, int x, int y)
 {
@@ -250,11 +654,25 @@ static void lxs_ts_finger_log(struct lxs_ts *ts,
 				"%s tID:%d dd:%d,%d mc:%d tc:%d lx:%d ly:%d %s\n",
 				rstr, i, pre_x[i] - tdata->x, pre_y[i] - tdata->y,
 				mc[i], tcount, tdata->x, tdata->y, iname);
-			mc[i]= 0;
+			mc[i] = 0;
 			pre_x[i] = 0;
 			pre_y[i] = 0;
 		}
 	}
+}
+
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
+static void init_report_area(struct lxs_ts *ts)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ts->circle_range_l); i++)
+		ts->circle_range_l[i] = ts->radius_landscape[i] * ts->radius_landscape[i];
+
+	for (i = 0; i < ARRAY_SIZE(ts->circle_range_p); i++)
+		ts->circle_range_p[i] = ts->radius_portrait[i] * ts->radius_portrait[i];
+
+	ts->report_rejected_event_flag = true;
 }
 
 static void report_clear(struct touch_data *tdata)
@@ -517,6 +935,97 @@ static void lxs_ts_finger_report_event(struct lxs_ts *ts, int release_all)
 
 	ts->event_cnt_finger++;
 }
+#else	/* !__SOMC_CUSTOM_INPUT_CTRL */
+static void lxs_ts_finger_report_event(struct lxs_ts *ts, int release_all)
+{
+	struct input_dev *input = ts->input;
+	struct touch_data *tdata = ts->tdata;
+	const char *iname = NULL;
+	u32 old_mask = ts->old_mask;
+	u32 new_mask = ts->new_mask;
+	u32 press_mask = 0;
+	u32 release_mask = 0;
+	u32 change_mask = 0;
+	u32 event_cnt = ts->event_cnt_finger;
+	int is_finger = !!(ts->intr_status & TS_IRQ_FINGER);
+//	int tcount = ts->tcount;
+	int i;
+
+//	t_dev_trcf(idev);
+
+	if (!input) {
+		t_dev_err(ts->dev, "no input device (report)\n");
+		return;
+	}
+
+	iname = dev_name(&input->dev);
+
+	if (!is_finger)
+		return;
+
+	change_mask = old_mask ^ new_mask;
+	press_mask = new_mask & change_mask;
+	release_mask = old_mask & change_mask;
+
+	t_dev_dbg_evt(ts->dev,
+		"%s: <%d> mask [new: %04x, old: %04x]\n",
+		iname, event_cnt, new_mask, old_mask);
+	t_dev_dbg_evt(ts->dev,
+		"%s: <%d> mask [change: %04x, press: %04x, release: %04x]\n",
+		iname, event_cnt, change_mask, press_mask, release_mask);
+
+	/* Palm state - Report Pressure value 255 */
+	if (ts->is_cancel) {
+		if (ts->fquirks->cancel_event_finger)
+			ts->fquirks->cancel_event_finger(ts);
+
+		ts->is_cancel = 0;
+	}
+
+	for (i = 0; i < ts->max_finger; i++, tdata++) {
+		if (new_mask & BIT(i)) {
+			input_mt_slot(input, i);
+		#if defined(__LXS_CONFIG_INPUT_ANDROID)
+			input_mt_report_slot_state(input, MT_TOOL_FINGER, true);
+		#endif	/* __LXS_CONFIG_INPUT_ANDROID */
+			input_report_key(input, BTN_TOUCH, 1);
+			input_report_key(input, BTN_TOOL_FINGER, 1);
+			input_report_abs(input, ABS_MT_TRACKING_ID, tdata->id);
+			input_report_abs(input, ABS_MT_POSITION_X, tdata->x);
+			input_report_abs(input, ABS_MT_POSITION_Y, tdata->y);
+			input_report_abs(input, ABS_MT_PRESSURE, tdata->pressure);
+			input_report_abs(input, ABS_MT_TOUCH_MAJOR, tdata->width_major);
+			input_report_abs(input, ABS_MT_TOUCH_MINOR, tdata->width_minor);
+			input_report_abs(input, ABS_MT_ORIENTATION, tdata->orientation);
+			if (ts->plat_data->mt_tool_max)
+				input_report_abs(input, ABS_MT_TOOL_TYPE, tdata->type);
+			continue;
+		}
+
+		if (release_mask & BIT(i)) {
+			input_mt_slot(input, i);
+		#if defined(__LXS_CONFIG_INPUT_ANDROID)
+			input_mt_report_slot_state(input, MT_TOOL_FINGER, false);
+		#else	/* __LXS_CONFIG_INPUT_ANDROID */
+			input_report_abs(ts->input, ABS_MT_TRACKING_ID, -1);
+		#endif	/* __LXS_CONFIG_INPUT_ANDROID */
+		}
+	}
+
+	if (!new_mask) {
+		input_report_key(input, BTN_TOUCH, 0);
+		input_report_key(input, BTN_TOOL_FINGER, 0);
+	}
+
+	ts->old_mask = new_mask;
+
+	input_sync(input);
+
+	lxs_ts_finger_log(ts, new_mask, press_mask, release_mask, release_all);
+
+	ts->event_cnt_finger++;
+}
+#endif	/* __SOMC_CUSTOM_INPUT_CTRL */
 
 static void lxs_ts_finger_release_all_event(struct lxs_ts *ts)
 {
@@ -531,13 +1040,48 @@ static void lxs_ts_finger_release_all_event(struct lxs_ts *ts)
 	ts->is_cancel = 0;
 }
 
+/* __LXS_SUPPORT_ABT */
+void __weak lxs_ts_abt_report_event(struct lxs_ts *ts, int release_all)
+{
+
+}
+
 static void lxs_ts_report_event(struct lxs_ts *ts)
 {
+	lxs_ts_abt_report_event(ts, 0);
+
 	lxs_ts_finger_report_event(ts, 0);
+}
+
+static void __used lxs_ts_report_wakeup(struct lxs_ts *ts)
+{
+	struct input_dev *input = ts->input;
+
+	pm_wakeup_event(ts->dev, 3000);
+
+	lxs_ts_release_all_event(ts);
+
+	t_dev_info(ts->dev, "Send KEY_WAKEUP\n");
+
+	input_report_key(input, KEY_WAKEUP, 1);
+	input_sync(input);
+
+	input_report_key(input, KEY_WAKEUP, 0);
+	input_sync(input);
+}
+
+static void lxs_ts_report_knock(struct lxs_ts *ts)
+{
+	if (ts->fquirks->report_knock)
+		ts->fquirks->report_knock(ts);
+	else
+		lxs_ts_report_wakeup(ts);
 }
 
 void lxs_ts_release_all_event(struct lxs_ts *ts)
 {
+	lxs_ts_abt_report_event(ts, 1);
+
 	lxs_ts_finger_release_all_event(ts);
 }
 
@@ -557,9 +1101,76 @@ static int lxs_ts_input_mt_init_slots(struct lxs_ts *ts, struct input_dev *input
 	return ret;
 }
 
+static void lxs_ts_node_sysfs(struct lxs_ts *ts, struct input_dev *input)
+{
+	ts->sysfs_input = input;
+	ts->sysfs_parent = input->dev.kobj.parent;
+	ts->sysfs_name = input->name;
+}
+
+static int lxs_ts_node_init(struct lxs_ts *ts)
+{
+	struct input_dev *input = ts->input_node;
+	int ret = 0;
+
+	if (input)
+		return 0;
+
+	input = input_allocate_device();
+	if (!input) {
+		t_dev_err(ts->dev, "failed to allocate memory for input device(node)\n");
+		return -ENOMEM;
+	}
+
+	input->dev.parent = (ts->plat_data->use_input_parent) ? ts->dev : NULL;
+
+	input->name = (const char *)ts->input_node_name;
+	input->phys = (const char *)ts->input_node_phys;
+	input->id.bustype = ts->bus_type;
+
+	set_bit(EV_SYN, input->evbit);
+	set_bit(EV_ABS, input->evbit);
+	set_bit(INPUT_PROP_DIRECT, input->propbit);
+	input_set_abs_params(input, ABS_X, 0, 0, 0, 0);
+	input_set_abs_params(input, ABS_Y, 0, 0, 0, 0);
+	input_set_abs_params(input, ABS_PRESSURE, 0, 0, 0, 0);
+
+	input_set_drvdata(input, ts);
+
+	ret = input_register_device(input);
+	if (ret < 0) {
+		t_dev_err(ts->dev, "failed to register input device(node), %d\n", ret);
+		input_free_device(input);
+		return ret;
+	}
+
+	ts->input_node = input;
+
+	t_dev_info(ts->dev, "input device[%s, %s] registered\n",
+		dev_name(&input->dev), input->phys);
+
+	lxs_ts_node_sysfs(ts, input);
+
+	return 0;
+}
+
+static void lxs_ts_node_free(struct lxs_ts *ts)
+{
+	struct input_dev *input = ts->input_node;
+
+	if (input == NULL)
+		return;
+
+	input_unregister_device(input);
+
+	ts->input_node = NULL;
+
+	t_dev_info(ts->dev, "input device[%s] released\n", ts->input_node_phys);
+}
+
 static int lxs_ts_finger_init(struct lxs_ts *ts)
 {
-	struct input_dev *input = NULL;
+	struct input_dev *input = ts->input;
 	int max_pressure = FINGER_MAX_PRESSURE;
 	int max_width = FINGER_MAX_WIDTH;
 	int max_orient = FINGER_MAX_ORIENT;
@@ -567,10 +1178,8 @@ static int lxs_ts_finger_init(struct lxs_ts *ts)
 
 	ts->event_cnt_finger = 0;
 
-	if (ts->input) {
-		t_dev_err(ts->dev, "input device has been already allocated!\n");
-		return -EINVAL;
-	}
+	if (input)
+		return 0;
 
 	input = input_allocate_device();
 	if (!input) {
@@ -587,7 +1196,7 @@ static int lxs_ts_finger_init(struct lxs_ts *ts)
 	input->dev.parent = (ts->plat_data->use_input_parent) ? ts->dev : NULL;
 
 	input->name = (const char *)ts->input_name;
-	input->phys = (const char *)ts->input_phys;;
+	input->phys = (const char *)ts->input_phys;
 	input->id.bustype = ts->bus_type;
 
 	set_bit(EV_SYN, input->evbit);
@@ -659,15 +1268,19 @@ static int lxs_ts_init_input(struct lxs_ts *ts)
 {
 	int ret = 0;
 
+	ret = lxs_ts_node_init(ts);
+	if (ret < 0)
+		return ret;
+
 	if (!ts->plat_data->max_x || !ts->plat_data->max_y) {
+#if defined(__LXS_SUPPORT_ADJ_INPUT)
+		return 0;
+#else
 		t_dev_err(ts->dev, "coord fault: max_x %d, max_y %d\n",
 			ts->plat_data->max_x, ts->plat_data->max_y);
 		return -EINVAL;
-	}
-
-#if defined(__LXS_CONFIG_INPUT_ANDROID)
-	t_dev_info(ts->dev, "input cfg status : __LXS_CONFIG_INPUT_ANDROID\n");
 #endif
+	}
 
 	ret = lxs_ts_finger_init(ts);
 	if (ret < 0)
@@ -676,6 +1289,7 @@ static int lxs_ts_init_input(struct lxs_ts *ts)
 	return 0;
 
 out_finger:
+	lxs_ts_node_free(ts);
 
 	return ret;
 }
@@ -685,6 +1299,27 @@ static void lxs_ts_free_input(struct lxs_ts *ts)
 	lxs_ts_release_all_event(ts);
 
 	lxs_ts_finger_free(ts);
+
+	lxs_ts_node_free(ts);
+}
+
+static int lxs_ts_input_post(struct lxs_ts *ts)
+{
+#if defined(__LXS_SUPPORT_ADJ_INPUT)
+	int ret = 0;
+
+	if (!ts->plat_data->max_x || !ts->plat_data->max_y) {
+		t_dev_err(ts->dev, "invalid dim: max_x %d, max_y %d\n",
+			ts->plat_data->max_x, ts->plat_data->max_y);
+		return -EFAULT;
+	}
+
+	ret = lxs_ts_init_input(ts);
+	if (ret < 0)
+		return ret;
+#endif
+
+	return 0;
 }
 
 static void lxs_ts_event_ctrl(struct lxs_ts *ts)
@@ -692,21 +1327,8 @@ static void lxs_ts_event_ctrl(struct lxs_ts *ts)
 	if (ts->intr_status & TS_IRQ_FINGER)
 		lxs_ts_report_event(ts);
 
-	if (ts->intr_status & TS_IRQ_KNOCK) {
-		struct input_dev *input = ts->input;
-
-		pm_wakeup_event(ts->dev, 3000);
-
-		lxs_ts_release_all_event(ts);
-
-		t_dev_info(ts->dev, "Send KEY_WAKEUP\n");
-
-		input_report_key(input, KEY_WAKEUP, 1);
-		input_sync(input);
-
-		input_report_key(input, KEY_WAKEUP, 0);
-		input_sync(input);
-	}
+	if (ts->intr_status & TS_IRQ_KNOCK)
+		lxs_ts_report_knock(ts);
 }
 
 static int __lxs_ts_irq_start(struct lxs_ts *ts)
@@ -719,8 +1341,10 @@ static int __lxs_ts_irq_start(struct lxs_ts *ts)
 	if (gpio_get_value(ts->plat_data->irq_pin))
 		return -EINVAL;
 
+#if defined(__DBG_IRQ_VS_SUSPEND)
 	if (ts->suspend_is_on_going)
 		return -EINVAL;
+#endif
 
 	if (ts->state_pm >= TS_DEV_PM_SUSPEND) {
 		t_dev_info(ts->dev, "irq resume: interrupt in suspend[%d]\n", ts->state_pm);
@@ -753,8 +1377,9 @@ static int __lxs_ts_irq_thread(struct lxs_ts *ts)
 
 	ret = lxs_hal_irq_handler(ts);
 	if (ret < 0) {
-		t_dev_dbg_irq(ts->dev, "Err in irq_handler of %s, %d",
-				ts->chip_name, ret);
+		t_dev_dbg_irq(ts->dev, "Err in irq_handler of %s, %d\n",
+			ts->chip_name, ret);
+
 		if (ret == -ETDSENTESDIRQ) {
 			lxs_ts_irq_control(ts, 0);
 
@@ -780,9 +1405,10 @@ static irqreturn_t __used lxs_ts_irq_thread(int irq, void *dev_id)
 
 	t_dev_dbg_irq(ts->dev, "irq_thread %d\n", irq);
 
-	if (ts->power_enabled == TS_POWER_OFF) {
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
+	if (lxs_ts_is_power_off(ts))
 		return IRQ_HANDLED;
-	}
+#endif
 
 	ret = __lxs_ts_irq_start(ts);
 	if (ret < 0)
@@ -925,6 +1551,7 @@ static void lxs_ts_free_irq(struct lxs_ts *ts)
 	ts->irqflags = 0;
 }
 
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
 int lxs_ts_get_pw_status(void)
 {
 	int ret = 0;
@@ -950,20 +1577,21 @@ exit:
 int lxs_ts_pw_lock(struct lxs_ts *ts, incell_pw_lock status)
 {
 	incell_pw_status pwr_status = { false, false };
+	int val;
 	int ret = 0;
 
-	mutex_lock(&ts->pw_lock);
-
 	if (status == INCELL_DISPLAY_POWER_LOCK) {
-		if (ts->lock_cnt != 0) {
-			ts->lock_cnt++;
-			goto out;
-		}
+		atomic_inc(&ts->lock_cnt);
+		val = atomic_read(&ts->lock_cnt);
+		t_dev_dbg_base(ts->dev, "POWER_LOCK_COUNT [%d]\n", val);
+		if (val != 1)
+			return 0;
 	} else {
-		if (ts->lock_cnt > 1) {
-			ts->lock_cnt--;
-			goto out;
-		}
+		atomic_dec(&ts->lock_cnt);
+		val = atomic_read(&ts->lock_cnt);
+		t_dev_dbg_base(ts->dev, "POWER_UNLOCK_COUNT [%d]\n", val);
+		if (val != 0)
+			return 0;
 	}
 
 	ret = incell_power_lock_ctrl(status, &pwr_status);
@@ -971,10 +1599,6 @@ int lxs_ts_pw_lock(struct lxs_ts *ts, incell_pw_lock status)
 	switch (ret) {
 	case INCELL_OK:
 		t_dev_dbg_base(ts->dev, "power status: %s\n", status ? "LOCK" : "UNLOCK");
-		if (status == INCELL_DISPLAY_POWER_LOCK)
-			ts->lock_cnt++;
-		else
-			ts->lock_cnt--;
 		break;
 	case INCELL_ERROR:
 	case INCELL_ALREADY_LOCKED:
@@ -983,11 +1607,20 @@ int lxs_ts_pw_lock(struct lxs_ts *ts, incell_pw_lock status)
 		t_dev_info(ts->dev, "power lock failed ret:%d\n", ret);
 		break;
 	}
-out:
-	t_dev_dbg_base(ts->dev, "POWER_LOCK_COUNT [%d]\n", ts->lock_cnt);
-	mutex_unlock(&ts->pw_lock);
+
 	return ret;
 }
+#else	/* !__SOMC_CUSTOM_POWER_CTRL */
+int lxs_ts_get_pw_status(void)
+{
+	return 0;
+}
+
+int lxs_ts_pw_lock(struct lxs_ts *ts, incell_pw_lock status)
+{
+	return 0;
+}
+#endif	/* __SOMC_CUSTOM_POWER_CTRL */
 
 #if defined(__LXS_SUPPORT_WATCHDOG)
 #define TS_WATCHDOG_TIME_OFF	0
@@ -1223,144 +1856,29 @@ static inline void lxs_ts_watchdog_init(struct lxs_ts *ts){	}
 static inline void lxs_ts_watchdog_free(struct lxs_ts *ts){	}
 #endif	/* __LXS_SUPPORT_WATCHDOG */
 
-int lxs_ts_suspend(struct lxs_ts *ts)
+static int lxs_ts_probe_post(struct lxs_ts *ts)
 {
 	int ret = 0;
 
-	t_dev_info(ts->dev, "%s: start\n", __func__);
+	lxs_hal_rinfo(ts);
 
-	if (!ts->probe_done && ts->after_probe.err) {
-		t_dev_err(ts->dev, "%s: probe failed. Do after_probe\n", __func__);
-	//	queue_delayed_work(ts->wq, &ts->after_probe.start, 0);
-		return 0;
-	}
+	ret = lxs_ts_input_post(ts);
+	if (ret < 0)
+		return ret;
 
-	cancel_delayed_work_sync(&ts->sys_reset_work);
-	cancel_delayed_work_sync(&ts->upgrade_work);
-	cancel_delayed_work_sync(&ts->init_work);
-	cancel_delayed_work_sync(&ts->after_probe.start);
-
-	ret = lxs_hal_touch_mode(ts, TS_MODE_SUSPEND);
-	if (ret)
-		t_dev_err(ts->dev, "%s: failed touch_mode(suspend), %d\n", __func__, ret);
-
-	t_dev_info(ts->dev, "%s: end\n", __func__);
-	return 0;
-}
-
-int lxs_ts_resume(struct lxs_ts *ts)
-{
-	int ret = 0;
-
-	t_dev_info(ts->dev, "%s: start\n", __func__);
-
-	if (!ts->probe_done && ts->after_probe.err) {
-		t_dev_err(ts->dev, "%s: probe failed. Do after_probe\n", __func__);
-		queue_delayed_work(ts->wq, &ts->after_probe.start, 0);
-		return 0;
-	}
-
-	ret = lxs_hal_touch_mode(ts, TS_MODE_RESUME);
-	if (ret)
-		t_dev_err(ts->dev, "%s: failed touch_mode(resume), %d\n", __func__, ret);
-
-	t_dev_info(ts->dev, "%s: end\n", __func__);
-	return 0;
-}
-
-int drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
-{
-	struct drm_ext_event *evdata = (struct drm_ext_event *)data;
-	struct lxs_ts *ts = container_of(self, struct lxs_ts, drm_notif);
-	struct lxs_ts_chip *chip = &ts->chip;
-	struct timespec64 time;
-	int blank;
-
-	if (evdata && evdata->data) {
-		if (event == DRM_EXT_EVENT_BEFORE_BLANK) {
-			blank = *(int *)evdata->data;
-			t_dev_info(ts->dev, "Before: %s\n",
-				(blank == DRM_BLANK_POWERDOWN) ? "Powerdown" :
-				(blank == DRM_BLANK_UNBLANK) ? "Unblank" :
-				 "???");
-			switch (blank) {
-			case DRM_BLANK_POWERDOWN:
-				if (!ts->probe_done) {
-					t_dev_info(ts->dev, "not already sleep out\n");
-					return 0;
-				}
-
-				ktime_get_boottime_ts64(&time);
-				t_dev_info(ts->dev, "start@%ld.%06ld\n",
-					time.tv_sec, time.tv_nsec);
-				lxs_ts_suspend(ts);
-				ktime_get_boottime_ts64(&time);
-				t_dev_info(ts->dev, "end@%ld.%06ld\n",
-					time.tv_sec, time.tv_nsec);
-				break;
-			case DRM_BLANK_UNBLANK:
-				t_dev_info(ts->dev, "Out of AOD mode first");
-				mutex_lock(&ts->lock);
-				chip->enable_lpm = false;
-				mutex_unlock(&ts->lock);
-				lxs_hal_enable_device(ts, true);
-				break;
-			default:
-				break;
-			}
-		} else if (event == DRM_EXT_EVENT_AFTER_BLANK) {
-			blank = *(int *)evdata->data;
-			t_dev_info(ts->dev, "After: %s\n",
-				(blank == DRM_BLANK_POWERDOWN) ? "Powerdown" :
-				(blank == DRM_BLANK_UNBLANK) ? "Unblank" :
-				 "???");
-			switch (blank) {
-			case DRM_BLANK_POWERDOWN:
-				/* after screen to LP/Off mode */
-				if (ts->probe_done)
-					lxs_ts_release_all_event(ts);
-				break;
-			case DRM_BLANK_UNBLANK:
-				if (!ts->probe_done) {
-					t_dev_info(ts->dev, "not already sleep out\n");
-					if (ts->after_probe.err)
-						lxs_ts_resume(ts);
-				} else if(ts->chip.enable_lpm == 1 && ts->chip.enable == 0) {
-					t_dev_info(ts->dev, "enable_lpm: %d, enable: %d\n",
-						ts->chip.enable_lpm, ts->chip.enable);
-					t_dev_info(ts->dev, "Skip After: Unblank");
-				} else {
-					ktime_get_boottime_ts64(&time);
-					t_dev_info(ts->dev, "start@%ld.%06ld\n",
-						time.tv_sec, time.tv_nsec);
-					lxs_ts_resume(ts);
-					ktime_get_boottime_ts64(&time);
-					t_dev_info(ts->dev, "end@%ld.%06ld\n",
-						time.tv_sec, time.tv_nsec);
-				}
-				break;
-			default:
-				break;
-			}
-		} else if (event == DRM_EXT_EVENT_AOD_CHANGE) {
-			int enabled = *(int *)evdata->data;
-			t_dev_info(ts->dev, "AOD change: %d\n", enabled);
-			mutex_lock(&ts->lock);
-			chip->enable_lpm = enabled;
-			mutex_unlock(&ts->lock);
-			lxs_hal_enable_device(ts, !enabled);
-		}
-	}
+	ts->probe_post = NULL;
 
 	return 0;
 }
 
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
 #define LXS_TS_RETRY_SESSION_COUNT 30
 static void lxs_ts_after_probe_func(struct work_struct *work)
 {
 	struct lxs_ts *ts =
 			container_of(to_delayed_work(work),
 						struct lxs_ts, after_probe.start);
+	int retry_count = LXS_TS_RETRY_SESSION_COUNT;
 	int ret = 0;
 
 	t_dev_info(ts->dev, "LXS(%s) after probe start(%s)\n",
@@ -1407,12 +1925,18 @@ static void lxs_ts_after_probe_func(struct work_struct *work)
 
 	t_dev_info(ts->dev, "LXS Touch Probe done\n");
 
+	ts->probe_post = lxs_ts_probe_post;
+
 #if defined(__LXS_SUPPORT_AUTO_START)
 	t_dev_info(ts->dev, "LXS Touch Auto Start\n");
 	queue_delayed_work(ts->wq, &ts->init_work, 0);
 #endif
 
 	lxs_ts_watchdog_init(ts);
+
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+	lxs_ts_psy_notifier_init(ts);
+#endif
 
 	return;
 
@@ -1424,13 +1948,14 @@ init_hal_fail:
 after_probe_fail:
 	ts->power_enabled = TS_POWER_OFF;
 	ts->after_probe_retry ++;
-	if (ts->after_probe_retry > LXS_TS_RETRY_SESSION_COUNT) {
+	if (ts->after_probe_retry > retry_count) {
 		t_dev_err(ts->dev, "stop after_work\n");
 		ts->after_probe.err = true;
 		return;
 	}
 	queue_delayed_work(ts->wq, &ts->after_probe.start, 1 * HZ);
 }
+#endif	/* __SOMC_CUSTOM_AFTER_PROBE */
 
 static void lxs_ts_init_work_func(struct work_struct *work)
 {
@@ -1445,6 +1970,11 @@ static void lxs_ts_init_work_func(struct work_struct *work)
 	t_dev_info(ts->dev, "LXS(%s) init work start(%s)\n",
 		ts->chip_name, LXS_DRV_VERSION);
 
+	if (ts->shutdown_called) {
+		t_dev_err(ts->dev, "%s shutdown was called\n", __func__);
+		return;
+	}
+
 	if (is_probe)
 		do_fw_upgrade |= !!(ts->plat_data->use_fw_upgrade);
 
@@ -1453,14 +1983,16 @@ static void lxs_ts_init_work_func(struct work_struct *work)
 	err = lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_LOCK);
 	if (err) {
 		t_dev_err(ts->dev, "%s: failed lock power, %d\n", __func__, err);
-		ts->chip.reset_is_on_going = false;
+		lxs_hal_reset_halt(ts);
 		mutex_unlock(&ts->lock);
 		return;
 	}
 
 	ret = lxs_hal_init(ts);
-	if (!ret)
-		lxs_ts_irq_control(ts, 1);
+	if (!ret) {
+		if (ts->state_sleep != TS_IC_SLEEP)
+			lxs_ts_irq_control(ts, 1);
+	}
 
 	err = lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_UNLOCK);
 	if (err)
@@ -1488,7 +2020,8 @@ static void lxs_ts_init_work_func(struct work_struct *work)
 	if (do_fw_upgrade) {
 		t_dev_info(ts->dev, "Touch F/W upgrade triggered(%Xh)\n", do_fw_upgrade);
 
-		queue_delayed_work(ts->wq, &ts->upgrade_work, 0);
+		if (!work_busy(&ts->upgrade_work.work))
+			queue_delayed_work(ts->wq, &ts->upgrade_work, 0);
 		return;
 	}
 
@@ -1511,8 +2044,57 @@ static int lxs_ts_upgrade_work(struct lxs_ts *ts)
 
 	t_dev_info(ts->dev, "FW upgrade work func\n");
 
+	if (ts->shutdown_called) {
+		t_dev_err(ts->dev, "%s shutdown was called\n", __func__);
+		return 0;
+	}
+
 	ts->state_core = TS_CORE_UPGRADE;
 	ts->plat_data->use_fw_upgrade = 0;
+
+#if defined(__LXS_SUPPORT_FW_DD)
+	if (ts->fw_sv_on) {
+		if (ts->fw_dd_data && ts->fw_dd_size) {
+			int pwr_con = !!(ts->plat_data->use_fw_pwr_rst);
+
+			mutex_lock(&ts->lock);
+
+			err = lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_LOCK);
+			if (err) {
+				ts->state_core = core_state;
+				t_dev_err(ts->dev, "%s: failed lock power, %d\n", __func__, err);
+				mutex_unlock(&ts->lock);
+
+				ts->fw_sv_on = 0;
+				return -EIO;
+			}
+
+			lxs_ts_irq_control(ts, 0);
+
+			ret = lxs_hal_upfdata(ts, ts->fw_dd_data, ts->fw_dd_size);
+
+			err = lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_UNLOCK);
+			if (err)
+				t_dev_err(ts->dev, "%s: failed unlock power, %d\n", __func__, err);
+
+			ts->force_fwup = TS_FORCE_FWUP_CLEAR;
+
+			ts->state_core = core_state;
+
+			if (ret == EACCES)
+				lxs_ts_irq_control(ts, !!irq_state);
+			else
+				lxs_hal_reset(ts, TC_HW_RESET_SYNC, pwr_con);
+
+			mutex_unlock(&ts->lock);
+		}
+
+		lxs_ts_fw_dd_clr(ts);
+
+		ts->fw_sv_on = 0;
+		return 0;
+	}
+#endif	/* __LXS_SUPPORT_FW_DD */
 
 	mutex_lock(&ts->lock);
 	err = lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_LOCK);
@@ -1540,9 +2122,7 @@ static int lxs_ts_upgrade_work(struct lxs_ts *ts)
 	/* upgrade not granted */
 	if (ret == EACCES) {
 		ts->state_core = core_state;
-		if (irq_state)
-			lxs_ts_irq_control(ts, 1);
-
+		lxs_ts_irq_control(ts, !!irq_state);
 		return 0;	/* skip reset */
 	}
 
@@ -1578,34 +2158,35 @@ static void lxs_ts_sys_reset_work_func(struct work_struct *work)
 	struct lxs_ts *ts =
 			container_of(to_delayed_work(work),
 				struct lxs_ts, sys_reset_work);
-#if defined(__LXS_SUPPORT_SYS_RESET)
 	struct input_dev *input = ts->input;
 
-	t_dev_info(ts->dev, "%s: send KEY_SLEEP\n", __func__);
+	if (ts->plat_data->use_sys_reset) {
+		t_dev_info(ts->dev, "%s: send KEY_SLEEP\n", __func__);
 
-	input_report_key(input, KEY_SLEEP, 1);
-	input_sync(input);
+		input_report_key(input, KEY_SLEEP, 1);
+		input_sync(input);
 
-	input_report_key(input, KEY_SLEEP, 0);
-	input_sync(input);
+		input_report_key(input, KEY_SLEEP, 0);
+		input_sync(input);
 
-	lxs_ts_delay(300);
+		lxs_ts_delay(300);
 
-	t_dev_info(ts->dev, "%s: send KEY_WAKEUP\n", __func__);
+		t_dev_info(ts->dev, "%s: send KEY_WAKEUP\n", __func__);
 
-	input_report_key(input, KEY_WAKEUP, 1);
-	input_sync(input);
+		input_report_key(input, KEY_WAKEUP, 1);
+		input_sync(input);
 
-	input_report_key(input, KEY_WAKEUP, 0);
-	input_sync(input);
-#else
+		input_report_key(input, KEY_WAKEUP, 0);
+		input_sync(input);
+		return;
+	}
+
 	t_dev_info(ts->dev, "%s: recovery\n", __func__);
 
 	if (ts->state_pm == TS_DEV_PM_RESUME)
 		pm_wakeup_event(ts->dev, 1000);
 
-	lxs_hal_reset(ts, TC_HW_RESET_ASYNC, 0);
-#endif
+	lxs_hal_reset(ts, TC_HW_RESET_ASYNC, !!(ts->state_sleep == TS_IC_SLEEP));
 }
 
 static int lxs_ts_init_works(struct lxs_ts *ts)
@@ -1616,13 +2197,18 @@ static int lxs_ts_init_works(struct lxs_ts *ts)
 		return -ENOMEM;
 	}
 
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
 	INIT_DELAYED_WORK(&ts->after_probe.start, lxs_ts_after_probe_func);
+#endif
 	INIT_DELAYED_WORK(&ts->init_work, lxs_ts_init_work_func);
 	INIT_DELAYED_WORK(&ts->upgrade_work, lxs_ts_upgrade_work_func);
 	INIT_DELAYED_WORK(&ts->sys_reset_work, lxs_ts_sys_reset_work_func);
 
 	init_completion(&ts->resume_done);
 	complete_all(&ts->resume_done);
+
+	init_waitqueue_head(&ts->resume_async_wait_q);
+	INIT_WORK(&ts->resume_async_work, lxs_ts_resume_async_work);
 
 	return 0;
 }
@@ -1647,6 +2233,8 @@ static int lxs_ts_parse_dts_pt(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_
 	 * pt_open_cmp = <0 1000>
 	 * pt_short_gnd_cmp = <0 2000>
 	 * pt_short_trx_cmp = <0 3000>
+	 * pt_short_vdd_cmp = <0 5200>
+	 * pt_sync_v_cmp = <114 126>
 	 */
 	memset(plat_data->pt_open_cmp, 0, sizeof(plat_data->pt_open_cmp));
 	if (of_property_read_u32_array(np, "pt_open_cmp", tmp, 2)) {
@@ -1696,11 +2284,56 @@ static int lxs_ts_parse_dts_pt(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_
 	return 0;
 }
 
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
+static int lxs_ts_parse_dts_grip(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_data)
+{
+	struct device_node *np = ts->dev->of_node;
+	u32 rejection_buff[4];
+
+	memset(ts->portrait_buffer, 0, sizeof(ts->portrait_buffer));
+	if (of_property_read_u32_array(np, "lxs,rejection_area_portrait", rejection_buff, 4))
+		t_dev_warn(ts->dev, "dts: lxs,rejection_area_portrait\n");
+	else
+		memcpy(ts->portrait_buffer, rejection_buff, sizeof(ts->portrait_buffer));
+
+	memset(ts->landscape_buffer, 0, sizeof(ts->landscape_buffer));
+	if (of_property_read_u32_array(np, "lxs,rejection_area_landscape", rejection_buff, 4))
+		t_dev_warn(ts->dev, "dts: lxs,rejection_area_landscape\n");
+	else
+		memcpy(ts->landscape_buffer, rejection_buff, sizeof(ts->landscape_buffer));
+
+	memset(ts->radius_portrait, 0, sizeof(ts->radius_portrait));
+	if (of_property_read_u32_array(np, "lxs,rejection_area_portrait_ge", rejection_buff, 2))
+		t_dev_warn(ts->dev, "dts: lxs,rejection_area_portrait_ge\n");
+	else
+		memcpy(ts->radius_portrait, rejection_buff, sizeof(ts->radius_portrait));
+
+	memset(ts->radius_landscape, 0, sizeof(ts->radius_landscape));
+	if (of_property_read_u32_array(np, "lxs,rejection_area_landscape_ge", rejection_buff, 4))
+		t_dev_warn(ts->dev, "dts: lxs,rejection_area_landscape_ge\n");
+	else
+		memcpy(ts->radius_landscape, rejection_buff, sizeof(ts->radius_landscape));
+
+	t_dev_info(ts->dev, "grip(dt): portrait_buffer %d %d %d %d\n",
+		rejection_buff[0], rejection_buff[1], rejection_buff[2], rejection_buff[3]);
+
+	t_dev_info(ts->dev, "grip(dt): landscape_buffer %d %d %d %d\n",
+		rejection_buff[0], rejection_buff[1], rejection_buff[2], rejection_buff[3]);
+
+	t_dev_info(ts->dev, "grip(dt): radius_portrait %d %d\n",
+		rejection_buff[0], rejection_buff[1]);
+
+	t_dev_info(ts->dev, "grip(dt): radius_landscape %d %d %d %d\n",
+		rejection_buff[0], rejection_buff[1], rejection_buff[2], rejection_buff[3]);
+
+	return 0;
+}
+#endif	/* __SOMC_CUSTOM_INPUT_CTRL */
+
 static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_data)
 {
 	struct device_node *np = ts->dev->of_node;
 	u32 tmp[3] = { 0, };
-	u32 rejection_buff[4];
 	u32 val;
 	int pin_val = -1;
 
@@ -1718,7 +2351,7 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 		plat_data->reset_pin = -1;
 		t_dev_info(ts->dev, "of gpio  : reset-gpio ignored\n");
 	} else {
-		pin_val = of_get_named_gpio_flags(np, "reset-gpio", 0, NULL);
+		pin_val = of_get_named_gpio(np, "reset-gpio", 0);
 		if (!gpio_is_valid(pin_val)) {
 			t_dev_err(ts->dev, "of gpio  : reset-gpio invalid, %d\n", pin_val);
 			return -EINVAL;
@@ -1727,7 +2360,7 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 		plat_data->reset_pin = pin_val;
 	}
 
-	pin_val = of_get_named_gpio_flags(np, "irq-gpio", 0, NULL);
+	pin_val = of_get_named_gpio(np, "irq-gpio", 0);
 	if (!gpio_is_valid(pin_val)) {
 		t_dev_err(ts->dev, "of gpio  : irq-gpio invalid, %d\n", pin_val);
 		return -EINVAL;
@@ -1764,6 +2397,8 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 	if (!of_property_read_u32(np, "use_lpwg", &val))
 		plat_data->use_lpwg = val;
 #endif
+	if (!touch_mode_allowed(ts, LCD_MODE_U0))
+		plat_data->use_lpwg = 0;
 
 	/* Firmware */
 	plat_data->use_firmware = of_property_read_bool(np, "use_firmware");
@@ -1784,6 +2419,12 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 		of_property_read_string_index(np, "fw_image", 0, &plat_data->fw_name);
 	}
 
+	if (of_property_read_string(np, "avdd_name", &plat_data->avdd_name) < 0)
+		plat_data->avdd_name = "tsp_avdd_ldo";
+
+	if (of_property_read_string(np, "dvdd_name", &plat_data->dvdd_name) < 0)
+		plat_data->dvdd_name = "tsp_dvdd_ldo";
+
 	if (!of_property_read_u32(np, "use_irq_verify", &val))
 		plat_data->use_irq_verify = val;
 
@@ -1796,115 +2437,27 @@ static int lxs_ts_parse_dts(struct lxs_ts *ts, struct lxs_ts_plat_data *plat_dat
 	if (!of_property_read_u32(np, "use_tc_doze", &val))
 		plat_data->use_tc_doze = val;
 
+	if (!of_property_read_u32(np, "use_sys_reset", &val))
+		plat_data->use_sys_reset = val;
+
+	if (!of_property_read_u32(np, "use_pwr_connect", &val))
+		plat_data->use_pwr_connect = val;
+
 	if (!of_property_read_u32(np, "use_palm_opt", &val))
 		plat_data->use_palm_opt = val;
 
 	if (!of_property_read_u32(np, "use_charger_opt", &val))
 		plat_data->use_charger_opt = val;
 
-	if (!of_property_read_u32(np, "frame_tbl_type", &val))
-		plat_data->frame_tbl_type = val;
-
-	if (!of_property_read_string(np, "panel_spec", &plat_data->panel_spec_path))
-		if (plat_data->panel_spec_path)
-			t_dev_info(ts->dev, "of_string : panel_spec %s\n", plat_data->panel_spec_path);
-
-	if (!of_property_read_string(np, "self_test", &plat_data->self_test_path))
-		if (plat_data->self_test_path)
-			t_dev_info(ts->dev, "of_string : self_test %s\n", plat_data->self_test_path);
-
-	memset(ts->portrait_buffer, 0, sizeof(ts->portrait_buffer));
-	if (of_property_read_u32_array(np, "lxs,rejection_area_portrait", rejection_buff, 4)) {
-		t_dev_warn(ts->dev, "dts: lxs,rejection_area_portrait\n");
-	} else {
-		memcpy(ts->portrait_buffer, rejection_buff, sizeof(ts->portrait_buffer));
-	}
-
-	memset(ts->landscape_buffer, 0, sizeof(ts->landscape_buffer));
-	if (of_property_read_u32_array(np, "lxs,rejection_area_landscape", rejection_buff, 4)) {
-		t_dev_warn(ts->dev, "dts: lxs,rejection_area_landscape\n");
-	} else {
-		memcpy(ts->landscape_buffer, rejection_buff, sizeof(ts->landscape_buffer));
-	}
-
-	memset(ts->radius_portrait, 0, sizeof(ts->radius_portrait));
-	if (of_property_read_u32_array(np, "lxs,rejection_area_portrait_ge", rejection_buff, 2)) {
-		t_dev_warn(ts->dev, "dts: lxs,rejection_area_portrait_ge\n");
-	} else {
-		memcpy(ts->radius_portrait, rejection_buff, sizeof(ts->radius_portrait));
-	}
-
-	memset(ts->radius_landscape, 0, sizeof(ts->radius_landscape));
-	if (of_property_read_u32_array(np, "lxs,rejection_area_landscape_ge", rejection_buff, 4)) {
-		t_dev_warn(ts->dev, "dts: lxs,rejection_area_landscape_ge\n");
-	} else {
-		memcpy(ts->radius_landscape, rejection_buff, sizeof(ts->radius_landscape));
-	}
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
+	lxs_ts_parse_dts_grip(ts, plat_data);
+#endif
 
 	lxs_ts_parse_dts_pt(ts, plat_data);
 
 	t_dev_info(ts->dev, "DTS parsing done\n");
 
 	return 0;
-}
-
-static const int lxs_ts_d_ftbl_def_np[] = {
-	TS_DISP_FRAME_ASYNC,
-	TS_DISP_FRAME_60HZ,
-	TS_DISP_FRAME_120HZ,
-};
-
-static const int lxs_ts_d_ftbl_def_lp[] = {
-	TS_DISP_FRAME_ASYNC,
-	TS_DISP_FRAME_30HZ,
-};
-
-static const int lxs_ts_t_ftbl_def_np[] = {
-	TS_TOUCH_FRAME_60HZ,
-	TS_TOUCH_FRAME_120HZ,
-	TS_TOUCH_FRAME_240HZ_H,
-	TS_TOUCH_FRAME_240HZ,
-};
-
-static const int lxs_ts_t_ftbl_def_lp[] = {
-	TS_TOUCH_FRAME_L60HZ,
-	TS_TOUCH_FRAME_L120HZ,
-};
-
-static void lxs_ts_setup_frame_tbl(struct lxs_ts *ts)
-{
-	ts->d_frame_rate_np = TS_DISP_FRAME_60HZ;
-	ts->d_frame_rate_lp = TS_DISP_FRAME_ASYNC;
-	ts->d_frame_rate_off = TS_DISP_FRAME_ASYNC;
-	ts->d_frame_rate_aod = TS_DISP_FRAME_30HZ;
-
-	ts->t_frame_rate_np = TS_TOUCH_FRAME_120HZ;
-	ts->t_frame_rate_lp = TS_TOUCH_FRAME_L120HZ;
-
-	memset(ts->d_frame_tbl_np, -1, sizeof(ts->d_frame_tbl_np));
-	memset(ts->d_frame_tbl_lp, -1, sizeof(ts->d_frame_tbl_lp));
-	memset(ts->t_frame_tbl_np, -1, sizeof(ts->t_frame_tbl_np));
-	memset(ts->t_frame_tbl_lp, -1, sizeof(ts->t_frame_tbl_lp));
-
-	memcpy(ts->d_frame_tbl_np, lxs_ts_d_ftbl_def_np, sizeof(lxs_ts_d_ftbl_def_np));
-	memcpy(ts->d_frame_tbl_lp, lxs_ts_d_ftbl_def_lp, sizeof(lxs_ts_d_ftbl_def_lp));
-	memcpy(ts->t_frame_tbl_np, lxs_ts_t_ftbl_def_np, sizeof(lxs_ts_t_ftbl_def_np));
-	memcpy(ts->t_frame_tbl_lp, lxs_ts_t_ftbl_def_lp, sizeof(lxs_ts_t_ftbl_def_lp));
-
-	switch (ts->plat_data->frame_tbl_type) {
-	case 1:
-		ts->d_frame_rate_np = TS_DISP_FRAME_ASYNC;
-		ts->d_frame_rate_lp = TS_DISP_FRAME_ASYNC;
-		ts->d_frame_rate_off = TS_DISP_FRAME_ASYNC;
-		ts->d_frame_rate_aod = TS_DISP_FRAME_ASYNC;
-
-		memset(ts->d_frame_tbl_np, -1, sizeof(ts->d_frame_tbl_np));
-		memset(ts->d_frame_tbl_lp, -1, sizeof(ts->d_frame_tbl_lp));
-
-		ts->d_frame_tbl_np[0] = TS_DISP_FRAME_ASYNC;
-		ts->d_frame_tbl_lp[0] = TS_DISP_FRAME_ASYNC;
-		break;
-	}
 }
 
 static int lxs_ts_setup(struct lxs_ts *ts)
@@ -1958,6 +2511,9 @@ static int lxs_ts_setup(struct lxs_ts *ts)
 	if (plat_data->use_charger_opt)
 		t_dev_info(ts->dev, " use_charger_opt = 0x%X\n", plat_data->use_charger_opt);
 
+	if (plat_data->use_pwr_connect)
+		t_dev_info(ts->dev, " use_pwr_connect = 0x%X\n", plat_data->use_pwr_connect);
+
 	if (plat_data->use_fw_pwr_rst)
 		t_dev_info(ts->dev, " use_fw_pwr_rst  = %d\n", plat_data->use_fw_pwr_rst);
 
@@ -1967,12 +2523,40 @@ static int lxs_ts_setup(struct lxs_ts *ts)
 	if (plat_data->use_fw_skip_pid)
 		t_dev_info(ts->dev, " use_fw_skip_pid = %d\n", plat_data->use_fw_skip_pid);
 
-	if (plat_data->frame_tbl_type)
-		t_dev_info(ts->dev, " frame_tbl_type  = %d\n", plat_data->frame_tbl_type);
+	if (plat_data->use_irq_verify)
+		t_dev_info(ts->dev, " use_irq_verify  = %d\n", plat_data->use_irq_verify);
 
-	lxs_ts_setup_frame_tbl(ts);
+	if (plat_data->use_skip_reset)
+		t_dev_info(ts->dev, " use_skip_reset  = %d\n", plat_data->use_skip_reset);
+
+	if (plat_data->use_input_parent)
+		t_dev_info(ts->dev, " use_input_parent = %d\n", plat_data->use_input_parent);
+
+	if (plat_data->use_tc_vblank)
+		t_dev_info(ts->dev, " use_tc_vblank   = %d\n", plat_data->use_tc_vblank);
+
+	if (plat_data->use_tc_doze)
+		t_dev_info(ts->dev, " use_tc_doze     = %d\n", plat_data->use_tc_doze);
+
+	if (plat_data->use_sys_reset)
+		t_dev_info(ts->dev, " use_sys_reset   = %d\n", plat_data->use_sys_reset);
+
+	if (plat_data->fw_name)
+		t_dev_info(ts->dev, " fw_name         = %s\n", plat_data->fw_name);
+
+	if (ts->fquirks->setup)
+		ts->fquirks->setup(ts);
 
 	return 0;
+}
+
+void some_function(struct lxs_ts *ts)  
+
+{  
+
+    struct device_node *np = ts->dev->of_node; 
+    lxs_register_for_panel_events(np, ts);  
+
 }
 
 static void lxs_ts_unset(struct lxs_ts *ts)
@@ -1984,10 +2568,10 @@ static void lxs_ts_unset(struct lxs_ts *ts)
 	}
 }
 
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
 int lxs_ts_probe(struct lxs_ts *ts)
 {
 	int ret = 0;
-	int i = 0;
 
 	lxs_ts_params(ts);
 
@@ -2007,9 +2591,8 @@ int lxs_ts_probe(struct lxs_ts *ts)
 		return ret;
 	}
 
-	if (ts->is_charger) {
+	if (ts->is_charger)
 		return 0;
-	}
 
 	ret = lxs_ts_init_works(ts);
 	if (ret) {
@@ -2029,46 +2612,39 @@ int lxs_ts_probe(struct lxs_ts *ts)
 		goto out_init_input;
 	}
 
-	ret = lxs_ts_init_pm(ts);
-	if (ret) {
-		t_dev_err(ts->dev, "failed to init pm\n");
-		goto out_init_pm;
-	}
-
 	ret = lxs_ts_init_sysfs(ts);
 	if (ret) {
 		t_dev_err(ts->dev, "failed to init sysfs, %d\n", ret);
 		goto out_init_sysfs;
 	}
 
-	/* init notification callbacks */
-	ts->drm_notif.notifier_call = drm_notifier_callback;
+	//ret = lxs_ts_init_pm(ts);
+	//if (ret) {
+	//	t_dev_err(ts->dev, "failed to init pm\n");
+	//	goto out_init_pm;
+	//}
 
-	ret = drm_register_client(&ts->drm_notif);
-	if (ret) {
-		t_dev_err(ts->dev, "Unable to register drm_notifier: %d\n", ret);
-		goto out_err_notifier_register_client;
-	}
-
-	for (; i < 4; i++) {
-		ts->circle_range_l[i] = ts->radius_landscape[i] * ts->radius_landscape[i];
-		if (i < 2)
-			ts->circle_range_p[i] = ts->radius_portrait[i] * ts->radius_portrait[i];
-	}
-
-	ts->report_rejected_event_flag = true;
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
+	init_report_area(ts);
+#endif
 
 	ts->probe_init = 1;
 
+#if defined(__LXS_TEST)
+	t_dev_info(ts->dev, "run after_probe\n");
+	queue_delayed_work(ts->wq, &ts->after_probe.start, 0);
+#else
+	/* After display init done,
+	 * system shall execute 'echo 1 > /sys/devices/virtual/input/lxs_ts_input/after_probe'
+	 */
+#endif
+
 	return 0;
 
-out_err_notifier_register_client:
+out_init_pm:
 	lxs_ts_free_sysfs(ts);
 
 out_init_sysfs:
-	lxs_ts_free_pm(ts);
-
-out_init_pm:
 	lxs_ts_free_input(ts);
 
 out_init_input:
@@ -2094,9 +2670,9 @@ void lxs_ts_remove(struct lxs_ts *ts, int is_shutdown)
 	if (!ts->probe_init)
 		return;
 
-	mutex_lock(&ts->lock);
 	ts->shutdown_called = true;
-	mutex_unlock(&ts->lock);
+
+	cancel_work_sync(&ts->resume_async_work);
 
 	lxs_ts_watchdog_free(ts);
 
@@ -2108,17 +2684,18 @@ void lxs_ts_remove(struct lxs_ts *ts, int is_shutdown)
 	cancel_delayed_work_sync(&ts->after_probe.start);
 
 	if (ts->probe_done) {
+	#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+		lxs_ts_psy_notifier_free(ts);
+	#endif
 		lxs_hal_deactivate(ts);
 		lxs_ts_free_irq(ts);
 		lxs_hal_remove(ts);
 		ts->probe_done = 0;
 	}
 
-	drm_unregister_client(&ts->drm_notif);
+	//lxs_ts_free_pm(ts);
 
 	lxs_ts_free_sysfs(ts);
-
-	lxs_ts_free_pm(ts);
 
 	lxs_ts_free_input(ts);
 
@@ -2130,3 +2707,202 @@ void lxs_ts_remove(struct lxs_ts *ts, int is_shutdown)
 
 	ts->probe_init = 0;
 }
+#else	/* !__SOMC_CUSTOM_AFTER_PROBE */
+int lxs_ts_probe(struct lxs_ts *ts)
+{
+	int ret = 0;
+
+	lxs_ts_params(ts);
+
+	if (ts->fquirks->charger_mode) {
+		/*
+		 * if charger mode, set 'ts->is_charger = 1',
+		 */
+		ts->fquirks->charger_mode(ts);
+	}
+
+	t_dev_info(ts->dev, "LXS Touch Probe%s\n",
+		(ts->is_charger) ? "(charger)" : "");
+
+	ret = lxs_ts_setup(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to parse touch data, %d\n", ret);
+		return ret;
+	}
+
+	if (ts->is_charger)
+		return 0;
+
+	ret = lxs_ts_init_works(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to init works, %d\n", ret);
+		goto out;
+	}
+
+	ret = lxs_ts_init_gpios(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to init gpios, %d\n", ret);
+		goto out_init_gpios;
+	}
+
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
+	if (lxs_ts_get_pw_status()) {
+		t_dev_err(ts->dev, "params update, will update feature on resume\n");
+		goto out_pw_status;
+	}
+
+	ts->power_enabled = TS_POWER_ON;
+	t_dev_info(ts->dev, "%s: change power status to power on\n", __func__);
+	lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_LOCK);
+#endif
+
+	ret = lxs_hal_probe(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to probe, %d\n", ret);
+		goto out_hal_probe;
+	}
+
+	ret = lxs_ts_init_input(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to register input device, %d\n", ret);
+		goto out_init_input;
+	}
+
+	if (ts->idx)
+		snprintf(ts->irq_name, sizeof(ts->irq_name), "%s%d", LXS_TS_NAME, ts->idx);
+	else
+		strlcpy(ts->irq_name, LXS_TS_NAME, sizeof(ts->irq_name));
+	ret = lxs_ts_request_irq(ts, NULL, lxs_ts_irq_thread,
+			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, ts->irq_name);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to request thread irq(%d), %d\n",
+			ts->irq, ret);
+		goto out_request_irq;
+	}
+
+	ret = lxs_ts_init_sysfs(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to init sysfs, %d\n", ret);
+		goto out_init_sysfs;
+	}
+	check_dt(ts->dev->of_node);
+/*
+	ret = lxs_ts_init_pm(ts);
+	if (ret) {
+		t_dev_err(ts->dev, "failed to init pm\n");
+		goto out_init_pm;
+	}
+*/
+	//if (ts->touch_environment && !strcmp(ts->touch_environment, "pvm")) {
+		some_function(ts);
+		t_dev_info(ts->dev, "LXS Touch drm Start\n");
+	//}
+	lxs_hal_activate(ts);
+
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
+	lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_UNLOCK);
+#endif
+
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
+	init_report_area(ts);
+#endif
+
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+	lxs_ts_psy_notifier_init(ts);
+#endif
+
+	ts->probe_done = 1;
+
+	t_dev_info(ts->dev, "LXS Touch Probe done\n");
+
+	ts->probe_post = lxs_ts_probe_post;
+
+#if defined(__LXS_SUPPORT_AUTO_START)
+	t_dev_info(ts->dev, "LXS Touch Auto Start\n");
+	if (ts->plat_data->use_skip_reset)
+		lxs_hal_reset(ts, TC_HW_RESET_ASYNC, 0);
+	else
+		queue_delayed_work(ts->wq, &ts->init_work, 0);
+#endif
+
+	lxs_ts_watchdog_init(ts);
+
+	return 0;
+
+out_init_sysfs:
+	lxs_ts_free_irq(ts);
+lxs_ts_free_sysfs(ts);
+
+out_request_irq:
+	lxs_ts_free_input(ts);
+
+out_init_input:
+	lxs_hal_remove(ts);
+
+out_hal_probe:
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
+	lxs_ts_pw_lock(ts, INCELL_DISPLAY_POWER_UNLOCK);
+	ts->power_enabled = TS_POWER_OFF;
+
+out_pw_status:
+#endif
+	lxs_ts_free_gpios(ts);
+
+out_init_gpios:
+	lxs_ts_free_works(ts);
+
+out:
+	lxs_ts_unset(ts);
+	return ret;
+}
+
+void lxs_ts_remove(struct lxs_ts *ts, int is_shutdown)
+{
+	t_dev_info(ts->dev, "LXS Touch %s%s\n",
+		(is_shutdown) ? "Shutdown" : "Remove",
+		(ts->is_charger) ? "(charger)" : "");
+
+	if (ts->is_charger)
+		return;
+
+	if (!ts->probe_done)
+		return;
+
+	ts->shutdown_called = true;
+
+	cancel_work_sync(&ts->resume_async_work);
+
+	lxs_ts_watchdog_free(ts);
+
+	lxs_ts_irq_control(ts, 0);
+
+	cancel_delayed_work_sync(&ts->sys_reset_work);
+	cancel_delayed_work_sync(&ts->upgrade_work);
+	cancel_delayed_work_sync(&ts->init_work);
+
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+	lxs_ts_psy_notifier_free(ts);
+#endif
+
+	lxs_hal_deactivate(ts);
+
+	//lxs_ts_free_pm(ts);
+	if (ts->notifier_cookie)
+		panel_event_notifier_unregister(ts->notifier_cookie);
+	lxs_ts_free_sysfs(ts);
+
+	lxs_ts_free_irq(ts);
+
+	lxs_ts_free_input(ts);
+
+	lxs_hal_remove(ts);
+
+	lxs_ts_free_gpios(ts);
+
+	lxs_ts_free_works(ts);
+
+	lxs_ts_unset(ts);
+
+	ts->probe_done = 0;
+}
+#endif	/* __SOMC_CUSTOM_AFTER_PROBE */

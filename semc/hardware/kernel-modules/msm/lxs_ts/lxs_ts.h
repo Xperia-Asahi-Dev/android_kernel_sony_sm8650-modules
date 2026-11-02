@@ -1,13 +1,15 @@
-/*
- * SPDX-License-Identifier: GPL-2.0
- *
- * lxs_ts.h
+/* SPDX-License-Identifier: GPL-2.0
  *
  * LXS touch core layer
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2024 Sony Corporation,
+ * and licensed under the license of the file.
  */
 
 #ifndef __LXS_TS_H
@@ -78,8 +80,46 @@
 
 #include <linux/errno.h>
 
-#include <linux/drm_notify.h>
+#include <linux/power_supply.h>
+
+#define __SOMC_CUSTOM
+#if defined(__SOMC_CUSTOM)
+#define __SOMC_CUSTOM_POWER_CTRL
+#define __SOMC_CUSTOM_DRM_NOTIF
+#define __SOMC_CUSTOM_AFTER_PROBE
+#define __SOMC_CUSTOM_GPIO_SHARE
+#define __SOMC_CUSTOM_INPUT_CTRL
+#endif
+
+#if defined(__SOMC_CUSTOM_DRM_NOTIF)
+//#include <linux/drm_notify.h>
+#include <linux/soc/qcom/panel_event_notifier.h>
+#endif
+
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
 #include <linux/incell.h>
+#else
+typedef enum {
+	INCELL_DISPLAY_POWER_UNLOCK,
+	INCELL_DISPLAY_POWER_LOCK,
+} incell_pw_lock;
+#endif
+
+#if IS_ENABLED(CONFIG_POWER_SUPPLY)
+#if (KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE)
+#define __LXS_SUPPORT_POWER_SUPPLY
+#endif
+#endif	/* CONFIG_POWER_SUPPLY */
+
+#if (KERNEL_VERSION(5, 18, 0) <= LINUX_VERSION_CODE)
+#define __LXS_SUPPORT_NEW_SYSFS_ATTR
+#endif
+
+#if (KERNEL_VERSION(5, 4, 0) > LINUX_VERSION_CODE)
+#ifndef fallthrough
+#define fallthrough do {} while (0)  /* fallthrough */
+#endif
+#endif
 
 #ifndef __weak
 #define __weak __attribute__((weak))
@@ -150,10 +190,10 @@ extern u32 t_bus_dbg_mask;
 				pr_info(fmt, ##args);	\
 		} while (0)
 
-
 #define __t_dev_none(_dev, fmt, args...)	\
-		do{	\
-			if (0) dev_printk(KERN_DEBUG, _dev, fmt, ##args);	\
+		do {	\
+			if (0)	\
+				dev_dbg(_dev, fmt, ##args);	\
 		} while (0)
 
 #define __t_dev_info(_dev, fmt, args...)	dev_info(_dev, fmt, ##args)
@@ -169,7 +209,7 @@ extern u32 t_bus_dbg_mask;
 
 #define t_dev_info_once(_dev, fmt, args...)	\
 		({						\
-			static bool __dev_info_once = false;	\
+			static bool __dev_info_once;	\
 			if (!__dev_info_once) {			\
 				__dev_info_once = true;		\
 				__t_dev_info(_dev, fmt, ##args);	\
@@ -177,16 +217,16 @@ extern u32 t_bus_dbg_mask;
 		})
 #define t_dev_warn_once(_dev, fmt, args...)	\
 		({						\
-			static bool __dev_warn_once = false;	\
-			if (!__dev_warn_once) { 		\
-				__dev_warn_once = true; 	\
+			static bool __dev_warn_once;	\
+			if (!__dev_warn_once) {			\
+				__dev_warn_once = true;		\
 				__t_dev_warn_tag(_dev, fmt, ##args); \
 			}					\
 		})
 
 #define t_dev_trace_once(_dev, fmt, args...)	\
 		({						\
-			static bool __dev_trace_once = false;	\
+			static bool __dev_trace_once;	\
 			if (!__dev_trace_once) {		\
 				__dev_trace_once = true;	\
 				__t_dev_trace_tag(_dev, fmt, ##args); \
@@ -195,7 +235,7 @@ extern u32 t_bus_dbg_mask;
 
 #define t_dev_err_once(_dev, fmt, args...)	\
 		({						\
-			static bool __dev_err_once = false; \
+			static bool __dev_err_once; \
 			if (!__dev_err_once) {		\
 				__dev_err_once = true;	\
 				__t_dev_err_tag(_dev, fmt, ##args); \
@@ -259,7 +299,8 @@ extern u32 t_bus_dbg_mask;
 
 /*-----------------------------------------------------------------------------
  * Configuration
- *---------------------------------------------------------------------------*/
+ *-----------------------------------------------------------------------------
+ */
 #if IS_ENABLED(CONFIG_I2C)
 #define __LXS_SUPPORT_I2C
 #endif
@@ -273,10 +314,9 @@ extern u32 t_bus_dbg_mask;
 #endif
 
 #if IS_ENABLED(CONFIG_NET)
-//#define __LXS_SUPPORT_ABT
+#define __LXS_SUPPORT_ABT
+#define __LXS_CUSTOM_BUILD_WA_FOR_KERNEL_LISTEN
 #endif
-
-//#define __LXS_SUPPORT_DEBUG_OPTION
 
 #if IS_ENABLED(CONFIG_OF)
 #define __LXS_CONFIG_OF
@@ -288,8 +328,36 @@ extern u32 t_bus_dbg_mask;
 
 #define __LXS_SUPPORT_OLED
 
+//#define __LXS_SUPPORT_ADJ_INPUT
+
+#define __LXS_SUPPORT_LPWG
+//#define __LXS_SUPPORT_SLEEP
+
+#define __LXS_SUPPORT_AUTO_START
+
+#define __LXS_SUPPORT_FW_DD
+
+/*---------------------------------------------------------------------------*/
+
+/* __SOMC_CUSTOM ~*/
+#ifndef CONFIG_TOUCHSCREEN_LXS_LX82907A
+#define CONFIG_TOUCHSCREEN_LXS_LX82907A	1
+#endif
+
+#define __LXS_SUPPORT_DISP_FRAME_RATE
+
+#define __LXS_SUPPORT_WATCHDOG
+
+#define __LXS_SUPPORT_FILTER_CON
+
+#define __LXS_QUIRK_SLEEP
+/*~ __SOMC_CUSTOM */
+
+/*---------------------------------------------------------------------------*/
+
 #define LXS_TS_NAME		"lxs_ts"
 #define LXS_TS_INPUT	"lxs_ts_input"
+#define LXS_TS_FINGER	"lxs_ts_finger"
 
 #define MAX_FINGER			10
 
@@ -299,20 +367,8 @@ enum _LXS_CHIP_TYPE {
 	CHIP_SW82907	= 0x0897,
 	CHIP_SW82908	= 0x0898,
 	CHIP_SW82910	= 0x089A,
+	CHIP_LX82907A	= CHIP_SW82907,
 };
-
-#define __LXS_SUPPORT_LPWG
-//#define __LXS_SUPPORT_SLEEP
-
-#define __LXS_SUPPORT_AUTO_START
-
-//#define __LXS_SUPPORT_SYS_RESET
-
-#define __LXS_SUPPORT_WATCHDOG
-
-#define __LXS_SUPPORT_FILTER_CON
-
-#define CONFIG_TOUCHSCREEN_LXS_SW82907
 
 /*---------------------------------------------------------------------------*/
 
@@ -336,6 +392,8 @@ enum _LXS_CHIP_TYPE {
 
 /*---------------------------------------------------------------------------*/
 
+#define ADDR_DIS_MASK				BIT(16)
+
 #define ADDR_SKIP_MASK				(0xFFFF)
 
 /*---------------------------------------------------------------------------*/
@@ -358,37 +416,14 @@ enum _LXS_CHIP_TYPE {
 #define TC_PRODUCT_ID1				(0x644)
 #define TC_PRODUCT_ID2				(0x645)
 
-#define INFO_FPC_TYPE				(0x278)
-#define INFO_WFR_TYPE				(0x27B)
 #define INFO_CHIP_VERSION			(0x001)
-#define INFO_CG_TYPE				(0x27D)
-#define INFO_LOT_NUM				(0x27E)
-#define INFO_SERIAL_NUM				(0x27F)
-#define INFO_DATE					(0x280)
-#define INFO_TIME					(0x281)
 
 #define CODE_ACCESS_ADDR			(0xFD8)
+#define SERIAL_DATA_OFFSET			(0x047)
 #define DATA_BASE_ADDR				(0xFD1)
-#define PRD_TCM_BASE_ADDR			(0x303)
 
 #define TC_DEVICE_CTL				(0xC00)
 #define TC_DRIVE_CTL				(0xC03)
-
-#define TCI_FAIL_DEBUG_R			(0x28D)
-#define TCI_FAIL_BIT_R				(0x28E)
-#define TCI_DEBUG_R					(0x2AE)
-
-#define TCI_FAIL_DEBUG_W			(0xC2C)
-#define TCI_FAIL_BIT_W				(0xC2D)
-
-#define TCI_DEBUG_FAIL_CTRL			(0xF5D)
-#define TCI_DEBUG_FAIL_STATUS		(0xF5E)
-#define TCI_DEBUG_FAIL_BUFFER		(0xF5F)
-
-/* debug data report mode setting */
-#define CMD_RAW_DATA_REPORT_MODE_READ	(0x2A4)
-#define CMD_RAW_DATA_COMPRESS_WRITE		(0xC47)
-#define CMD_RAW_DATA_REPORT_MODE_WRITE	(0xC49)
 
 #define RES_INFO					(0xD00)
 #define CHANNEL_INFO				(0xD01)
@@ -407,28 +442,21 @@ enum _LXS_CHIP_TYPE {
 /* production test */
 #define TC_TSP_TEST_CTL				(0xC04)
 #define TC_TSP_TEST_STS				(0x690)
-#define TC_TSP_TEST_PF_RESULT		(0x691)
-#define TC_TSP_TEST_OFF_INFO		(0x2FB)
+#define TC_TSP_TEST_RESULT			(0x691)
 
 /* Firmware control */
 #define TC_FLASH_DN_STS				(0x247)
 #define TC_CONFDN_BASE_ADDR			(0x2F9)
 #define TC_FLASH_DN_CTL				(0xC05)
 
-/* */
-#define RAW_DATA_CTL_READ			(0x2A4)
-#define RAW_DATA_CTL_WRITE			(0xC49)
-#define SERIAL_DATA_OFFSET			(0x047)
-
-#define PRD_SERIAL_TCM_OFFSET		(0x07C)
-#define PRD_TC_MEM_SEL				(0x457)
+#define PRD_IC_START_REG			(0xC8C)
+#define PRD_IC_READYSTATUS			(0xC84)
 #define PRD_TC_TEST_MODE_CTL		(0xC6E)
-#define PRD_M1_M2_RAW_OFFSET		(0x287)
 #define PRD_TUNE_RESULT_OFFSET		(0x289)
-#define PRD_OPEN3_SHORT_OFFSET		(0x288)
 
-#define PRD_IC_AIT_START_REG		(0xC8C)
-#define PRD_IC_AIT_DATA_READYSTATUS	(0xC84)
+#define ABT_REPORT_MODE_READ		(0x2A4)
+#define ABT_REPORT_MODE_WRITE		(0xC49)
+#define ABT_COMPRESS_WRITE			(0xC47)
 
 struct lxs_hal_reg {
 	u32 info_ptr;
@@ -444,25 +472,12 @@ struct lxs_hal_reg {
 	u32 tc_version;
 	u32 tc_product_id1;
 	u32 tc_product_id2;
-	u32 info_fpc_type;
-	u32 info_wfr_type;
 	u32 info_chip_version;
-	u32 info_cg_type;
-	u32 info_lot_num;
-	u32 info_serial_num;
-	u32 info_date;
-	u32 info_time;
 	u32 code_access_addr;
+	u32 serial_data_offset;
 	u32 data_base_addr;
-	u32 prd_tcm_base_addr;
 	u32 tc_device_ctl;
 	u32 tc_drive_ctl;
-	u32 tci_debug_fail_ctrl;
-	u32 tci_debug_fail_buffer;
-	u32 tci_debug_fail_status;
-	u32 cmd_raw_data_report_mode_read;
-	u32 cmd_raw_data_compress_write;
-	u32 cmd_raw_data_report_mode_write;
 	u32 res_info;
 	u32 channel_info;
 	u32 t_frame_rate;
@@ -477,23 +492,19 @@ struct lxs_hal_reg {
 	u32 dim_eng;
 	u32 tc_tsp_test_ctl;
 	u32 tc_tsp_test_status;
-	u32 tc_tsp_test_pf_result;
-	u32 tc_tsp_test_off_info;
+	u32 tc_tsp_test_result;
 	u32 tc_flash_dn_status;
 	u32 tc_confdn_base_addr;
 	u32 tc_flash_dn_ctl;
 	u32 raw_data_ctl_read;
 	u32 raw_data_ctl_write;
-	u32 serial_data_offset;
 	/* */
-	u32 prd_serial_tcm_offset;
-	u32 prd_tc_mem_sel;
-	u32 prd_tc_test_mode_ctl;
-	u32 prd_m1_m2_raw_offset;
-	u32 prd_tune_result_offset;
-	u32 prd_open3_short_offset;
-	u32 prd_ic_ait_start_reg;
-	u32 prd_ic_ait_data_readystatus;
+	u32 prd_ic_start_reg;
+	u32 prd_ic_readystatus;
+	/* */
+	u32 abt_report_mode_read;
+	u32 abt_report_mode_write;
+	u32 abt_compress_write;
 };
 
 /* Reg. exchange */
@@ -507,8 +518,8 @@ struct lxs_ts_reg_quirk {
 struct lxs_ts;
 
 enum {
-	TS_BUF_MARGIN		= 32,
-	TS_MAX_BUF_SIZE		= (32<<10),	//(64<<10),
+	TS_BUF_MARGIN	= 32,
+	TS_MAX_BUF_SIZE	= (32<<10),	//(64<<10),
 };
 
 enum {
@@ -547,49 +558,15 @@ enum {
 };
 
 enum {
-	/* NP */
-	TS_TOUCH_FRAME_60HZ = 1,	// 60Hz/60Hz (Active/Doze)
-	TS_TOUCH_FRAME_120HZ,		// 120Hz/120Hz
-	TS_TOUCH_FRAME_240HZ_H,		// 240Hz/120Hz
-	TS_TOUCH_FRAME_240HZ,		// 240Hz/240Hz
-	/* LP */
-	TS_TOUCH_FRAME_L60HZ = 5,	// 60Hz/30Hz
-	TS_TOUCH_FRAME_L120HZ,		// 120Hz/30Hz
-};
-
-enum {
-	TS_DISP_FRAME_ASYNC = 0,
-	TS_DISP_FRAME_30HZ,
-	TS_DISP_FRAME_60HZ,
-	TS_DISP_FRAME_120HZ,
-	/* */
-	TS_FRAME_TBL_SZ	= 16,
-};
-
-enum {
 	TS_CORE_NONE = 0,
 	TS_CORE_PROBE,
 	TS_CORE_UPGRADE,
 	TS_CORE_NORMAL,
 };
 
-// QCT USB connection
 enum {
-	TS_CONNECT_INVALID = 0,
-	TS_CONNECT_SDP,
-	TS_CONNECT_DCP,
-	TS_CONNECT_CDP,
-	TS_CONNECT_PROPRIETARY,
-	TS_CONNECT_FLOATED,
-	TS_CONNECT_HUB, /* SHOULD NOT change the value */
-};
-
-enum {
-	TS_CONNECT_NONE		= 0,
-	TS_CONNECT_USB		= 1,
-	TS_CONNECT_DC		= 2,
-	TS_CONNECT_OTG		= 3,
-	/* */
+	TS_CONNECT_NONE		= 0x00,
+	TS_CONNECT_WIRE		= 0x01,
 	TS_CONNECT_WIRELESS	= 0x10,
 };
 
@@ -597,12 +574,6 @@ enum {
 	TS_EARJACK_NONE = 0,
 	TS_EARJACK_NORMAL,
 	TS_EARJACK_DEBUG,
-};
-
-enum {
-	TS_DEBUG_TOOL_DISABLE = 0,
-	TS_DEBUG_TOOL_ENABLE,
-	TS_DEBUG_TOOL_MAX,
 };
 
 struct touch_data {
@@ -617,18 +588,25 @@ struct touch_data {
 	u16 type;
 	u16 event;
 
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
 	u16 saved_data_x;
 	u16 saved_data_y;
 	bool saved;
 	bool report_flag;
+#endif
 };
 
 struct lxs_ts_fquirks {	//function quirks
+	void (*setup)(struct lxs_ts *ts);
+	void (*activate)(struct lxs_ts *ts);
+	void (*deactivate)(struct lxs_ts *ts);
+	/* */
 	void (*charger_mode)(struct lxs_ts *ts);
 	/* */
 	int (*gpio_init_reset)(struct lxs_ts *ts);
 	void (*gpio_free_reset)(struct lxs_ts *ts);
 	void (*gpio_set_reset)(struct lxs_ts *ts, int val);
+	int (*gpio_get_reset)(struct lxs_ts *ts);
 	/* */
 	int (*gpio_init_irq)(struct lxs_ts *ts);
 	void (*gpio_free_irq)(struct lxs_ts *ts);
@@ -638,10 +616,17 @@ struct lxs_ts_fquirks {	//function quirks
 	int (*init_post)(struct lxs_ts *ts);
 	int (*init_end)(struct lxs_ts *ts);
 	/* */
+	void (*report_knock)(struct lxs_ts *ts);
 	void (*cancel_event_finger)(struct lxs_ts *ts);
 	/* */
 	int (*fwup_check)(struct lxs_ts *ts, u8 *fw_buf);
 	int (*fwup_upgrade)(struct lxs_ts *ts, u8 *fw_buf, int fw_size, int retry);
+	/* */
+	int (*fps_set_pre)(struct lxs_ts *ts, int mode);
+	int (*fps_set_post)(struct lxs_ts *ts, int mode);
+	int (*fps_update)(struct lxs_ts *ts, int value);
+	/* */
+	int (*tc_restore)(struct lxs_ts *ts);
 	/* */
 	void *sysfs_group;
 };
@@ -679,8 +664,8 @@ struct lxs_ts_entry_data {
 	int bits_per_word;
 	int max_freq;
 	/* */
-	int	bus_tx_hdr_size;
-	int	bus_rx_hdr_size;
+	int bus_tx_hdr_size;
+	int bus_rx_hdr_size;
 	int bus_tx_dummy_size;
 	int bus_rx_dummy_size;
 	int bus_custom;
@@ -690,17 +675,7 @@ struct lxs_ts_entry_data {
 	const struct lxs_ts_fquirks fquirks;
 };
 
-enum {
-	DEFAULT_NAME_SZ = PATH_MAX,
-};
-
-struct touch_event_param {
-	char *name;
-	int cmd;
-	int min;
-	int max;
-	int is_key;
-};
+#define TS_LOCATION_DETECT_SIZE	6
 
 #if !defined(__LXS_SUPPORT_OLED)
 #define __LXS_SUPPORT_STATUS_ERROR_CFG
@@ -715,8 +690,8 @@ struct lxs_hal_rw_multi {
 };
 
 enum {
-	NON_FAULT_INT 	= -1,
-	NON_FAULT_U32	= ~0,
+	NON_FAULT_INT = -1,
+	NON_FAULT_U32 = ~0,
 };
 
 #define TC_PALM_DETECTED	1
@@ -841,8 +816,6 @@ enum {
 	TC_HW_RESET_ASYNC,
 	TC_HW_RESET_SYNC,
 	//
-	TC_HW_RESET_COND = 0x5A,
-	//
 	TC_HW_RESET_SKIP_QUIRK = 0x10,
 };
 
@@ -861,12 +834,12 @@ enum {
 };
 
 enum {
-	LCD_MODE_BIT_U0 	= BIT(LCD_MODE_U0),
+	LCD_MODE_BIT_U0		= BIT(LCD_MODE_U0),
 	LCD_MODE_BIT_U3		= BIT(LCD_MODE_U3),
 	LCD_MODE_BIT_STOP	= BIT(LCD_MODE_STOP),
 };
 
-static const char *__lxs_lcd_driving_mode_strs[] = {
+static const char * const __lxs_lcd_driving_mode_strs[] = {
 	[LCD_MODE_U0]	= "LP",
 	[LCD_MODE_U3]	= "NP",
 	[LCD_MODE_STOP]	= "STOP",
@@ -1032,6 +1005,7 @@ enum {
 	BIN_PID_OFFSET_POS = 0xF0,
 };
 
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
 enum corners {		/* portrait,		landscape,	seascape     */
     CORNER_0 = 0,	/* Upper left,		Bottom left,	Upper right  */
     CORNER_1 = 1,	/* Bottom left,  	Bottom right,	Upper left   */
@@ -1047,6 +1021,7 @@ enum range_changer {
     TARGET_PORTRAIT_BOTTOM_LEFT = 4,	/* Bottom left  */
     TARGET_PORTRAIT_BOTTOM_RIGHT = 5,	/* Bottom right */
 };
+#endif
 
 struct lxs_hal_tc_version_bin {
 	u8 major:4;
@@ -1066,6 +1041,7 @@ struct lxs_hal_tc_version {
 } __packed;
 
 struct lxs_hal_fw_info {
+	int pid_lim;
 	u32 chip_id_raw;
 	u8 chip_id[8];
 	u32 sys_id_addr;
@@ -1078,7 +1054,7 @@ struct lxs_hal_fw_info {
 	} v;
 	/* */
 	int invalid_pid;
-	u8 product_id[8+4];
+	u8 product_id[16];
 	u8 revision;
 	u32 fpc;
 	u32 wfr;
@@ -1143,7 +1119,7 @@ static inline void lxs_hal_fw_set_revision(struct lxs_hal_fw_info *fw, u32 revis
 	fw->revision = revision & 0xFF;
 }
 
-#define PID_LEN_MAX	8
+#define PID_LEN_MAX	12
 #define PID_LEN_MIN	7
 
 #define PID_IN_RANGE(_val, _min, _max)	(((_val) >= (_min)) && ((_val) <= (_max)))
@@ -1155,38 +1131,19 @@ static inline int lxs_hal_fw_check_pid(char *pid)
 	int i;
 	char c;
 
-	if (len > PID_LEN_MAX) {
+	if (len > PID_LEN_MAX)
 		invalid |= BIT(9);
-	} else if (len < PID_LEN_MIN) {
+	else if (len < PID_LEN_MIN)
 		invalid |= BIT(8);
-	}
 
 	for (i = 0; i < len; i++) {
 		c = pid[i];
 
-	#if 0
-		if (isdigit(c)) {
+		if (PID_IN_RANGE(c, '0', '9'))
 			continue;
-		}
 
-		if (isalpha(c) && isupper(c)) {
+		if (PID_IN_RANGE(c, 'A', 'Z'))
 			continue;
-		}
-	#else
-		if (PID_IN_RANGE(c, '0', '9')) {
-			continue;
-		}
-
-		if (PID_IN_RANGE(c, 'A', 'Z')) {
-			continue;
-		}
-	#endif
-
-	#if defined(__LXS_HAL_TEST_ALLOW_PID_UNDERBAR)
-		if (c == '_') {
-			continue;
-		}
-	#endif
 
 		invalid |= BIT(i);
 	}
@@ -1196,7 +1153,8 @@ static inline int lxs_hal_fw_check_pid(char *pid)
 
 static inline void lxs_hal_fw_set_prod_id(struct lxs_hal_fw_info *fw, u8 *prod, u32 size)
 {
-	int len = min((int)sizeof(fw->product_id), (int)size);
+	int len = min_t(int, sizeof(fw->product_id), size);
+
 	memset(fw->product_id, 0, sizeof(fw->product_id));
 	memcpy(fw->product_id, prod, len);
 
@@ -1220,9 +1178,8 @@ static inline int lxs_hal_fw_ver_cmp(u32 bin_major, u32 bin_minor, u32 bin_build
 	}
 
 	/* check major no. */
-	if (bin_major < dev_major) {
+	if (bin_major < dev_major)
 		goto out;
-	}
 
 	if (bin_major > dev_major) {
 		update |= BIT(1);
@@ -1230,9 +1187,8 @@ static inline int lxs_hal_fw_ver_cmp(u32 bin_major, u32 bin_minor, u32 bin_build
 	}
 
 	/* check minor no. */
-	if (bin_minor < dev_minor) {
+	if (bin_minor < dev_minor)
 		goto out;
-	}
 
 	if (bin_minor > dev_minor) {
 		update |= BIT(2);
@@ -1240,9 +1196,8 @@ static inline int lxs_hal_fw_ver_cmp(u32 bin_major, u32 bin_minor, u32 bin_build
 	}
 
 	/* check build no. */
-	if (bin_build < dev_build) {
+	if (bin_build < dev_build)
 		goto out;
-	}
 
 	if (bin_build > dev_build) {
 		update |= BIT(3);
@@ -1351,7 +1306,8 @@ struct lxs_ts_chip_opt {
 	u32 f_glove_en:1;
 	u32 f_grab_en:1;
 	u32 f_dbg_report:1;
-	u32 f_rsvd00:4;
+	u32 f_rinfo:1;
+	u32 f_rsvd00:3;
 	/* */
 	u32 f_rsvd01:8;
 	u32 f_rsvd02:8;
@@ -1367,7 +1323,7 @@ struct lxs_ts_chip_opt {
 	u32 t_tc_cmd:4;
 	/* */
 	u32 t_tc_quirk:4;
-	u32 rsvd10:4;
+	u32 t_uni_id:4;
 	u32 rsvd11:8;
 	u32 rsvd12:8;
 	u32 rsvd13:8;
@@ -1417,12 +1373,14 @@ struct lxs_hal_lpwg_point {
 };
 
 struct lxs_ts_chip {
-#if defined(__LXS_SUPPORT_RINFO)
+	char uni_id_str[64];
+	u32 uni_id[3];
+
 	u32 iinfo_addr;
 	u32 rinfo_addr;
 	u32 rinfo_data[10];
 	u32 rinfo_ok;
-#endif
+
 	u32 res_x;
 	u32 res_y;
 	u32 tx_count;
@@ -1432,7 +1390,6 @@ struct lxs_ts_chip {
 	struct lxs_ts_chip_opt opt;
 	struct lxs_hal_reg reg_cur;
 	struct lxs_hal_reg *reg;
-	struct kobject kobj;
 	/* */
 	union {
 		struct lxs_hal_touch_info_a info_a;
@@ -1461,11 +1418,11 @@ struct lxs_ts_chip {
 	struct lxs_hal_status_filter *status_filter;
 	/* */
 	int enable;
-	int enable_lpm;
+	int enable_aod;
 	int enable_knock;
 	int enable_prox;
 	int enable_sleep;
-	int prev_lpm;
+	int prev_aod;
 	int prev_knock;
 	int prev_prox;
 	int prev_sleep;
@@ -1486,7 +1443,9 @@ struct lxs_ts_chip {
 	atomic_t init;
 	atomic_t boot;
 	int boot_fail_cnt;
+
 	volatile bool reset_is_on_going;
+
 	int glove;
 	int grab;
 	int debug_tool;
@@ -1503,10 +1462,10 @@ struct lxs_ts_chip {
 enum {
 	FWUP_STATUS_OK			= 0,
 	FWUP_STATUS_BUSY		= 1,
-	FWUP_STATUS_NG_OP	 	= 2,
+	FWUP_STATUS_NG_OP		= 2,
 	FWUP_STATUS_NG_F_OPEN	= 3,
 	FWUP_STATUS_NG_F_CHK	= 4,
-	FWUP_STATUS_NG_CODE 	= 5,
+	FWUP_STATUS_NG_CODE		= 5,
 	FWUP_STATUS_NG_CFG		= 6,
 	FWUP_STATUS_NG_IO		= 9,
 	FWUP_STATUS_MAX,
@@ -1515,7 +1474,7 @@ enum {
 #define LXS_FWUP_STATUS_STR(_sts)	\
 		[FWUP_STATUS_##_sts] = #_sts
 
-static const char *__lxs_fwup_status_strs[] = {
+static const char * const __lxs_fwup_status_strs[] = {
 	LXS_FWUP_STATUS_STR(OK),
 	LXS_FWUP_STATUS_STR(BUSY),
 	LXS_FWUP_STATUS_STR(NG_OP),
@@ -1535,7 +1494,7 @@ static inline const char *lxs_fwup_status_str(int status)
 }
 
 enum {
-	BOOT_FAIL_RECOVERY_MAX = 3,	/* to avoid infinite repetition */
+	BOOT_FAIL_RECOVERY_MAX = 10,	/* to avoid infinite repetition */
 };
 
 static inline int lxs_addr_is_skip(u32 addr)
@@ -1569,15 +1528,15 @@ enum {
 #define LXS_TS_GPIO_RST		"lxs_gpio_reset"
 #define LXS_TS_GPIO_IRQ		"lxs_gpio_irq"
 
-#define LXS_BUS_TAG 		"bus: "
-#define LXS_BUS_TAG_ERR 	"bus(E): "
+#define LXS_BUS_TAG			"bus: "
+#define LXS_BUS_TAG_ERR		"bus(E): "
 #define LXS_BUS_TAG_WARN	"bus(W): "
 #define LXS_BUS_TAG_DBG		"bus(D): "
 
 #define t_bus_info(_dev, fmt, args...)	\
 		__t_dev_info(_dev, LXS_BUS_TAG fmt, ##args)
 
-#define t_bus_warn(_abt, fmt, args...)	\
+#define t_bus_warn(_dev, fmt, args...)	\
 		__t_dev_warn(_dev, LXS_BUS_TAG_WARN fmt, ##args)
 
 #define t_bus_err(_dev, fmt, args...)	\
@@ -1634,14 +1593,15 @@ struct lxs_ts_plat_data {
 	bool use_input_parent;
 	bool use_tc_vblank;
 	bool use_tc_doze;
+	bool use_sys_reset;
 	u32 use_palm_opt;
 	u32 use_charger_opt;
+	u32 use_pwr_connect;
 
-	u32 frame_tbl_type;
+	const char *avdd_name;
+	const char *dvdd_name;
 
 	const char *fw_name;
-	const char *panel_spec_path;
-	const char *self_test_path;
 
 #if defined(__LXS_SUPPORT_WATCHDOG)
 	struct lxs_ts_watchdog watchdog;
@@ -1658,11 +1618,13 @@ struct lxs_ts_plat_data {
 	u32 pt_sync_v_cmp[2];	/* v-sync */
 };
 
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
 struct after_probe_work_t {
 	struct delayed_work start;
 	bool err;
 	int retry;
 };
+#endif
 
 struct lxs_ts {
 	int idx;
@@ -1671,20 +1633,24 @@ struct lxs_ts {
 
 	struct lxs_ts_plat_data *plat_data;
 
-	int chip_type;
+	const struct lxs_ts_entry_data *entry_data;
 
-	int lock_cnt;
+	int chip_type;
 
 	char chip_id[128];
 	char chip_name[128];
+	char input_node_name[128];
+	char input_node_phys[128];
 	char input_name[128];
 	char input_phys[128];
 	char irq_name[128];
 	int max_finger;
 	u32 mode_allowed;
-
+	void *notifier_cookie;
+	const char *touch_environment;
 	int irq;
 	unsigned long irqflags;
+	int irq_chk_cnt;
 
 	void *bus_priv;				/* __LXS_SUPPORT_PM_QUIRK */
 
@@ -1692,9 +1658,14 @@ struct lxs_ts {
 	struct lxs_ts_chip chip;
 	u32 fw_size;
 
+	struct input_dev *input_node;
 	struct input_dev *input;
 
 	struct kobject kobj;
+
+	struct input_dev *sysfs_input;
+	struct kobject *sysfs_parent;
+	const char *sysfs_name;
 
 	int state_core;
 	int state_pm;
@@ -1706,19 +1677,17 @@ struct lxs_ts {
 	int state_ime;
 	int state_incoming_call;
 
+	int d_frame_rate;
+	int t_frame_rate;
+
+	/* extension */
 	int d_frame_rate_np;
 	int d_frame_rate_lp;
 	int d_frame_rate_off;
 	int d_frame_rate_aod;
 
-	int d_frame_tbl_np[TS_FRAME_TBL_SZ];
-	int d_frame_tbl_lp[TS_FRAME_TBL_SZ];
-
 	int t_frame_rate_np;
 	int t_frame_rate_lp;
-
-	int t_frame_tbl_np[TS_FRAME_TBL_SZ];
-	int t_frame_tbl_lp[TS_FRAME_TBL_SZ];
 
 	int suspend_is_on_going;
 
@@ -1728,6 +1697,7 @@ struct lxs_ts {
 	struct regulator *avdd;
 	struct regulator *dvdd;
 	int power_enabled;
+	int power_working;
 
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pinctrl_state_on;
@@ -1754,9 +1724,7 @@ struct lxs_ts {
 	struct mutex lock;
 	struct mutex bus_lock;
 	struct mutex reset_lock;
-	struct mutex pw_lock;
 	struct workqueue_struct *wq;
-	struct after_probe_work_t after_probe;
 	struct delayed_work init_work;
 	struct delayed_work upgrade_work;
 	struct delayed_work sys_reset_work;
@@ -1772,7 +1740,21 @@ struct lxs_ts {
 	int watchdog_time;
 #endif
 
+	int resume_async;
+	bool resume_async_flag;
+	wait_queue_head_t resume_async_wait_q;
+	struct work_struct resume_async_work;
 	struct completion resume_done;
+
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+	int psy_detect;
+	struct power_supply *psy_batt;
+	struct power_supply *psy_usb;
+	struct power_supply *psy_otg;
+	struct power_supply *psy_wireless;
+	struct delayed_work psy_work;
+	struct notifier_block psy_notifier;
+#endif
 
 #if defined(__LXS_CONFIG_FB)
 	struct notifier_block fb_notif;
@@ -1814,22 +1796,42 @@ struct lxs_ts {
 
 	struct lxs_ts_fquirks *fquirks;
 
+	int (*probe_post)(struct lxs_ts *ts);
+
 	/* */
 	int is_charger;
 
-	int probe_init;
 	int probe_done;
 
 	/* */
 	void *prd;
-	u32 prd_quirks;
 
+#if defined(__LXS_SUPPORT_ABT)
 	void *abt;
-	u32 abt_quirks;
+#endif
 
+#if defined(__LXS_SUPPORT_FW_DD)
+	struct mutex fw_dd_lock;
+	u8 *fw_dd_data;
+	int fw_dd_size;
+	int fw_sv_on;
+#endif
+
+#if defined(__SOMC_CUSTOM_POWER_CTRL)
+	atomic_t lock_cnt;
+#endif
+
+#if defined(__SOMC_CUSTOM_DRM_NOTIF)
 	struct notifier_block drm_notif;
-	int after_probe_retry;
+#endif
 
+#if defined(__SOMC_CUSTOM_AFTER_PROBE)
+	struct after_probe_work_t after_probe;
+	int after_probe_retry;
+	int probe_init;
+#endif
+
+#if defined(__SOMC_CUSTOM_INPUT_CTRL)
 	/* For grip rejection */
 	bool landscape;
 	int rejection_mode;
@@ -1842,6 +1844,7 @@ struct lxs_ts {
 
 	u32 circle_range_p[2];
 	u32 circle_range_l[4];
+#endif
 
 #if defined(__LXS_SUPPORT_FILTER_CON)
 	int blend_filter;
@@ -1850,11 +1853,15 @@ struct lxs_ts {
 #endif
 };
 
-enum {
-	PRD_QUIRK_RAW_RETURN_MODE_VAL	= BIT(0),
-	/* */
-	ABT_QUIRK_RAW_RETURN_MODE_VAL	= BIT(0),
-};
+static inline int lxs_ts_is_power_off(struct lxs_ts *ts)
+{
+	return (ts->power_working) ? (ts->power_enabled == TS_POWER_OFF) : 0;
+}
+
+static inline u32 lxs_ts_act_buf_size(struct lxs_ts *ts)
+{
+	return (ts->buf_size - TS_BUF_MARGIN) & (~0x3FF);
+}
 
 /* ts->force_fwup */
 enum {
@@ -1889,23 +1896,8 @@ struct lxs_ts_attribute {
 		struct bin_attribute ts_bin_attr_##_name	\
 			= __BIN_ATTR(_name, 0664, _show, _store, _size)
 
-static inline int touch_lookup_frame_tbl(int *table, int value)
-{
-	int val = 0;
-	int i;
-
-	if (table == NULL)
-		return -1;
-
-	for (i = 0; i < TS_FRAME_TBL_SZ; i++) {
-		val = *table++;
-		if (value == val)
-			return val;
-		if (val < 0)
-			break;
-	}
-	return -1;
-}
+#define __ts_attr_def(_name)		(&ts_attr_##_name.attr),
+#define __ts_bin_attr_def(_name)	(&ts_bin_attr_##_name),
 
 static inline u32 touch_mode_allowed(struct lxs_ts *ts, u32 mode)
 {
@@ -1917,9 +1909,8 @@ static inline u32 touch_mode_not_allowed(struct lxs_ts *ts, u32 mode)
 	int ret;
 
 	ret = !touch_mode_allowed(ts, mode);
-	if (ret) {
+	if (ret)
 		t_dev_warn(ts->dev, "target mode(%d) not supported\n", mode);
-	}
 
 	return ret;
 }
@@ -1976,6 +1967,21 @@ static inline u32 lxs_report_info_touch_cnt(struct lxs_ts *ts)
 	struct lxs_ts_chip *chip = &ts->chip;
 
 	return chip->info_grp.info.touch_cnt;
+}
+
+static inline int lxs_report_track_id_1st(struct lxs_ts *ts)
+{
+	struct lxs_hal_touch_data *touch_data = lxs_report_data(ts);
+
+	if (touch_data == NULL)
+		return 0;
+
+	switch (ts->chip.report_type) {
+	case CHIP_REPORT_TYPE_1:
+		return ((struct lxs_hal_touch_data_type_1 *)touch_data)[0].track_id;
+	}
+
+	return touch_data[0].track_id;
 }
 
 static inline int lxs_hal_get_fwup_status(struct lxs_ts *ts)
@@ -2036,7 +2042,7 @@ static inline u32 lxs_hal_boot_sts_mask_empty(struct lxs_ts *ts)
 #define __lxs_snprintf(_buf, _buf_max, _size, _fmt, _args...) \
 		({	\
 			int _n_size = 0;	\
-			if (_size < _buf_max)	\
+			if ((_buf != NULL) && (_size < _buf_max))	\
 				_n_size = snprintf(_buf + _size, _buf_max - _size,\
 								(const char *)_fmt, ##_args);	\
 			_n_size;	\
@@ -2046,9 +2052,24 @@ static inline u32 lxs_hal_boot_sts_mask_empty(struct lxs_ts *ts)
 #define lxs_snprintf(_buf, _size, _fmt, _args...) \
 		__lxs_snprintf(_buf, PAGE_SIZE, _size, _fmt, ##_args)
 
+#define lxs_gen_snprintf(_buf, _buf_max, _size, _fmt, _args...) \
+		__lxs_snprintf(_buf, _buf_max, _size, _fmt, ##_args)
+
+#define lxs_dev_snprintf(_dev, _buf, _size, _fmt, _args...) \
+		({	int len = 0;	\
+			if (_buf)	\
+				len = lxs_snprintf(_buf, _size, _fmt, ##_args);	\
+			else	\
+				t_dev_info(_dev, _fmt, ##_args);	\
+			len;	\
+		})
+
 /*
  * Bus control
  */
+#define __CLOCK_KHZ(x)		((x) * 1000)
+#define __CLOCK_MHZ(x)		((x) * 1000 * 1000)
+
 enum {
 	I2C_BUS_TX_HDR_SZ = 2,
 	I2C_BUS_RX_HDR_SZ = 0,
@@ -2070,10 +2091,9 @@ enum {
 	SPI_BUS_RX_HDR_SZ = SPI_BUS_RX_HDR_SZ_32BIT,
 	SPI_BUS_TX_DUMMY_SZ = 0,
 	SPI_BUS_RX_DUMMY_SZ = SPI_BUS_RX_DUMMY_SZ_32BIT,
+	/* */
+	SPI_SPEED_HZ = __CLOCK_MHZ(5),
 };
-
-#define __CLOCK_KHZ(x)		((x) * 1000)
-#define __CLOCK_MHZ(x)		((x) * 1000 * 1000)
 
 static inline int spi_freq_out_of_range(u32 freq)
 {
@@ -2104,6 +2124,50 @@ struct lxs_ts_if_driver {
 	int idx;
 };
 
+#if defined(__LXS_SUPPORT_POWER_SUPPLY)
+#define lxs_ts_psy_get(ts, psy, name, flag)	\
+{{	\
+	if (!psy) {	\
+		psy = power_supply_get_by_name(name);	\
+		if (psy) {	\
+			ts->psy_detect |= flag;	\
+			t_dev_info(ts->dev, "power supply found: %s\n", name);	\
+		}	\
+	}	\
+}}	\
+
+#define lxs_ts_psy_property(ts, psy, function, property, value) \
+({	\
+	int ret = -ESRCH;	\
+	if (!psy) {	\
+		value.intval = -1;	\
+		ret = -ENOENT;	\
+	} else {	\
+		if (psy->desc->function##_property != NULL) { \
+			ret = psy->desc->function##_property(psy, \
+				(enum power_supply_property) (property), &(value)); \
+			if (ret < 0) {	\
+				t_dev_err(ts->dev, "%s: failed to %s "#function" (%d=>%d)\n", \
+					__func__, psy->desc->name, (property), ret);	\
+				value.intval = -1;	\
+			}	\
+		}	\
+	}	\
+	ret;	\
+})
+#endif	/* __LXS_SUPPORT_POWER_SUPPLY */
+
+#if defined(__LXS_SUPPORT_FW_DD)
+static inline void lxs_ts_fw_dd_clr(struct lxs_ts *ts)
+{
+	if (ts->fw_dd_data)
+		kfree(ts->fw_dd_data);
+
+	ts->fw_dd_data = NULL;
+	ts->fw_dd_size = 0;
+}
+#endif
+
 /*
  * Input control
  */
@@ -2132,9 +2196,9 @@ extern int lxs_hal_access_not_allowed(struct lxs_ts *ts, char *title, int skip_f
 extern int lxs_hal_ic_info(struct lxs_ts *ts);
 extern int lxs_hal_init(struct lxs_ts *ts);
 extern int lxs_hal_reset(struct lxs_ts *ts, int ctrl, int pwr_con);
+extern void lxs_hal_reset_halt(struct lxs_ts *ts);
 extern void lxs_hal_deep_sleep(struct lxs_ts *ts);
-extern int lxs_hal_usb_status(struct lxs_ts *ts);
-extern int lxs_hal_wireless_status(struct lxs_ts *ts);
+extern void lxs_hal_connect(struct lxs_ts *ts);
 extern int lxs_hal_ime_state(struct lxs_ts *ts);
 extern int lxs_hal_incoming_call(struct lxs_ts *ts);
 extern int lxs_hal_tc_con(struct lxs_ts *ts, u32 code, void *param);
@@ -2151,6 +2215,13 @@ extern int lxs_hal_irq_handler(struct lxs_ts *ts);
 extern int lxs_hal_irq_abs(struct lxs_ts *ts);
 extern int lxs_hal_irq_lpwg(struct lxs_ts *ts);
 
+extern int lxs_hal_chipset_option_log(struct lxs_ts *ts, char *buf);
+
+extern void lxs_hal_rinfo_channel(struct lxs_ts *ts);
+extern void lxs_hal_rinfo_resolution(struct lxs_ts *ts);
+extern void lxs_hal_rinfo_base(struct lxs_ts *ts);
+extern void lxs_hal_rinfo(struct lxs_ts *ts);
+
 extern void lxs_hal_activate(struct lxs_ts *ts);
 extern void lxs_hal_deactivate(struct lxs_ts *ts);
 
@@ -2159,7 +2230,10 @@ extern void lxs_hal_remove(struct lxs_ts *ts);
 
 extern void lxs_hal_upgrade_setup(struct lxs_ts *ts);
 extern int lxs_hal_upgrade(struct lxs_ts *ts);
+extern int lxs_hal_upfdata(struct lxs_ts *ts, u8 *fdata, int fsize);
 /* */
+
+extern void lxs_ts_options(struct lxs_ts *ts);
 
 extern int lxs_ts_init_sysfs(struct lxs_ts *ts);
 extern void lxs_ts_free_sysfs(struct lxs_ts *ts);
@@ -2179,6 +2253,11 @@ extern int lxs_ts_set_pinctrl(struct lxs_ts *ts, bool on);
 
 extern int lxs_ts_power_ctrl(struct lxs_ts *ts, int ctrl);
 extern int lxs_ts_power_reset(struct lxs_ts *ts, int ctrl);
+#if defined(__LXS_QUIRK_SLEEP)
+extern void lxs_ts_power_quirk_sleep(struct lxs_ts *ts);
+#endif
+extern void lxs_ts_power_connect(struct lxs_ts *ts);
+extern void lxs_ts_power_disconnect(struct lxs_ts *ts);
 
 extern void lxs_ts_irq_control(struct lxs_ts *ts, bool on);
 
@@ -2187,6 +2266,7 @@ extern void lxs_ts_release_all_event(struct lxs_ts *ts);
 extern int lxs_ts_probe(struct lxs_ts *ts);
 extern void lxs_ts_remove(struct lxs_ts *ts, int is_shutdown);
 
+/* __SOMC_CUSTOM */
 extern int lxs_ts_get_pw_status(void);
 extern int lxs_ts_pw_lock(struct lxs_ts *ts, incell_pw_lock status);
 
@@ -2200,13 +2280,6 @@ extern void lxs_ts_watchdog_time(struct lxs_ts *ts, int time);
 static inline void lxs_ts_watchdog_run(struct lxs_ts *ts){	}
 static inline void lxs_ts_watchdog_stop(struct lxs_ts *ts){	}
 static inline void lxs_ts_watchdog_time(struct lxs_ts *ts, int time){	}
-#endif
-
-#if defined(__LXS_SUPPORT_FILTER_CON)
-extern int lxs_hal_chk_filter(struct lxs_ts *ts, int idx, int wr);
-#define lxs_hal_blend_filter(_ts)	lxs_hal_chk_filter(_ts, 0, 1)
-#define lxs_hal_stop_filter(_ts)	lxs_hal_chk_filter(_ts, 1, 1)
-#define lxs_hal_wet_mode(_ts)		lxs_hal_chk_filter(_ts, 0, 0)
 #endif
 
 #endif /* __LXS_TS_H */

@@ -1,8 +1,12 @@
 /*
- * SPDX-License-Identifier: GPL-2.0
+ * Copyright 2024 Sony Corporation.
  *
- * lxs_ts_hal_fw.c
- *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+// SPDX-License-Identifier: GPL-2.0
+/*
  * LXS touch fw upgrade
  *
  * This program is free software; you can redistribute it and/or modify
@@ -39,16 +43,17 @@ static int lxs_hal_condition_wait(struct lxs_ts *ts,
 
 		data = data1 | data2;
 		if (ret >= 0) {
-			match = (cond == NOT_COND) ?	\
-				!!((data & mask) != expect) : !!((data & mask) == expect);
+			if (cond == NOT_COND)
+				match = !!((data & mask) != expect);
+			else
+				match = !!((data & mask) == expect);
 
 			if (match) {
 				if (value)
 					*value = data;
 
 				t_dev_dbg_fwup(ts->dev,
-					"wait done: addr[%04Xh] data[%08Xh], "
-					"mask[%08Xh], expect[%s%08Xh]\n",
+					"wait done: addr[%04Xh] data[%08Xh], mask[%08Xh], expect[%s%08Xh]\n",
 					addr, data, mask,
 					(cond == NOT_COND) ? "not " : "",
 					expect);
@@ -61,8 +66,7 @@ static int lxs_hal_condition_wait(struct lxs_ts *ts,
 		*value = data;
 
 	t_dev_err(ts->dev,
-		"wait fail: addr[%04Xh] data[%08Xh], "
-		"mask[%08Xh], expect[%s%08Xh]\n",
+		"wait fail: addr[%04Xh] data[%08Xh], mask[%08Xh], expect[%s%08Xh]\n",
 		addr, data, mask,
 		(cond == NOT_COND) ? "not " : "",
 		expect);
@@ -72,9 +76,7 @@ static int lxs_hal_condition_wait(struct lxs_ts *ts,
 
 static u32 lxs_hal_fw_act_buf_size(struct lxs_ts *ts)
 {
-	int buf_size = (ts->buf_size - TS_BUF_MARGIN) & (~0x3FF);
-
-	return buf_size;
+	return lxs_ts_act_buf_size(ts);
 }
 
 static int lxs_hal_fw_rd_value(struct lxs_ts *ts, u32 addr, u32 *value, char *title)
@@ -85,10 +87,6 @@ static int lxs_hal_fw_rd_value(struct lxs_ts *ts, u32 addr, u32 *value, char *ti
 	if (title == NULL)
 		title = "FW upgrade";
 
-	t_dev_dbg_fwup_wr(ts->dev,
-		"%s: read: addr[%04Xh]\n",
-		title, addr);
-
 	ret = lxs_hal_read_value(ts, addr, &data);
 	if (ret < 0) {
 		t_dev_err(ts->dev,
@@ -96,6 +94,10 @@ static int lxs_hal_fw_rd_value(struct lxs_ts *ts, u32 addr, u32 *value, char *ti
 			title, ret, addr);
 		return ret;
 	}
+
+	t_dev_dbg_fwup_wr(ts->dev,
+		"%s: read: addr[%04Xh], value[%08Xh]\n",
+		__func__, addr, data);
 
 	if (value)
 		*value = data;
@@ -172,6 +174,7 @@ static int lxs_hal_fw_wr_data(struct lxs_ts *ts,
 	ret = lxs_hal_reg_write(ts, data_base, (void *)dn_buf, dn_size);
 	if (ret < 0) {
 		int prt_len = min(dn_size, 16);
+
 		t_dev_err(ts->dev,
 			"%s: wdata failed(%d) - addr 0x%04X, buf %*ph %s\n",
 			__func__, ret, data_base, prt_len, dn_buf,
@@ -236,13 +239,13 @@ static int __oled_fw_sw_crc_t3(struct lxs_ts *ts, const char *title)
 	struct lxs_ts_chip *chip = &ts->chip;
 	struct lxs_hal_fw_info *fw = &chip->fw;
 	u32 dsp_saddr = fw->bdma_saddr;
-	u32 dsp_ctrl1 =	fw->bdma_ctrl;
+	u32 dsp_ctrl = fw->bdma_ctrl;
 	u32 ctrl_data = 0;
 	int ret = 0;
 
-	if (!dsp_saddr || !dsp_ctrl1) {
-		t_dev_err(ts->dev, "%s: setup error, saddr %04Xh, ctrl1 %04Xh\n",
-			title, dsp_saddr, dsp_ctrl1);
+	if (!dsp_saddr || !dsp_ctrl) {
+		t_dev_err(ts->dev, "%s: setup error, saddr %04Xh, ctrl %04Xh\n",
+			title, dsp_saddr, dsp_ctrl);
 		return -EINVAL;
 	}
 
@@ -254,10 +257,10 @@ static int __oled_fw_sw_crc_t3(struct lxs_ts *ts, const char *title)
 	}
 
 	ctrl_data = 0x015FFFE9;
-	ret = lxs_hal_fw_wr_value(ts, dsp_ctrl1, ctrl_data);
+	ret = lxs_hal_fw_wr_value(ts, dsp_ctrl, ctrl_data);
 	if (ret < 0) {
-		t_dev_err(ts->dev, "%s: failed - DSP_CTRL1(%04Xh) write %08Xh, %d\n",
-			title, dsp_ctrl1, ctrl_data, ret);
+		t_dev_err(ts->dev, "%s: failed - DSP_CTRL(%04Xh) write %08Xh, %d\n",
+			title, dsp_ctrl, ctrl_data, ret);
 		goto out;
 	}
 
@@ -485,7 +488,7 @@ static int __oled_fwup_flash_erase_t3(struct lxs_ts *ts)
 			__func__, fc_err, ret);
 	} else {
 		u32 crc_erase_value = 0x48F6B687;
-		u32 crc_val= 0;
+		u32 crc_val = 0;
 
 		ret = lxs_hal_oled_fwup_flash_crc(ts, &crc_val);
 		if (ret < 0) {
@@ -526,7 +529,7 @@ static void __oled_fwup_flash_poss_chk(struct lxs_ts *ts)
 	}
 }
 
-static int __oled_fwup_flash_erase(struct lxs_ts *ts)
+static int __oled_fwup_flash_erjob(struct lxs_ts *ts)
 {
 	struct lxs_ts_chip *chip = &ts->chip;
 	struct lxs_hal_fw_info *fw = &chip->fw;
@@ -538,54 +541,81 @@ static int __oled_fwup_flash_erase(struct lxs_ts *ts)
 	int busy_time = fw->fc_erase_wait_time;
 	int busy_cnt = (4<<10)/busy_time;
 	u32 chk_resp, data;
-	int i;
 	int ret = 0;
 
 	__oled_fwup_flash_poss_chk(ts);
 
-	for (i = 0; i < 3; i++) {
-		fc_err = 0;
+	do {
+		ret = lxs_hal_fw_wr_value(ts, fc_addr, 0);
+		if (ret < 0) {
+			fc_err = 1;
+			break;
+		}
 
-		do {
-			ret = lxs_hal_fw_wr_value(ts, fc_addr, 0);
-			if (ret < 0) {
-				fc_err = 1;
-				break;
-			}
+		ret = lxs_hal_fw_wr_value(ts, fc_ctrl, fw->fc_ctrl_mass_erase);
+		if (ret < 0) {
+			fc_err = 2;
+			break;
+		}
 
-			ret = lxs_hal_fw_wr_value(ts, fc_ctrl, fw->fc_ctrl_mass_erase);
-			if (ret < 0) {
-				fc_err = 2;
-				break;
-			}
+		ret = lxs_hal_fw_wr_value(ts, fc_start, 1);
+		if (ret < 0) {
+			fc_err = 3;
+			break;
+		}
 
-			ret = lxs_hal_fw_wr_value(ts, fc_start, 1);
-			if (ret < 0) {
-				fc_err = 3;
-				break;
-			}
+		chk_resp = 1;
+		ret = lxs_hal_condition_wait(ts, flash_status, &data,
+				chk_resp, ~0, busy_time, busy_cnt, NOT_COND);
+		if (ret < 0) {
+			fc_err = 4;
+			t_dev_err(ts->dev, "%s: failed - flash erase wait(%Xh), %Xh\n",
+				__func__, chk_resp, data);
+			break;
+		}
+	} while (0);
 
-			chk_resp = 1;
-			ret = lxs_hal_condition_wait(ts, flash_status, &data,
-					chk_resp, ~0, busy_time, busy_cnt, NOT_COND);
-			if (ret < 0) {
-				fc_err = 4;
-				t_dev_err(ts->dev, "%s: failed - flash erase wait(%Xh), %Xh\n",
-					__func__, chk_resp, data);
-				break;
-			}
-		} while (0);
+	lxs_ts_delay(10);
 
-		lxs_ts_delay(10);
+	lxs_hal_fw_wr_value(ts, fc_ctrl, 0);
 
-		lxs_hal_fw_wr_value(ts, fc_ctrl, 0);
-	}
-
-	if (fc_err)
+	if (fc_err) {
 		t_dev_err(ts->dev, "%s: failed - flash mass erase error, %d, %d\n",
 			__func__, fc_err, ret);
-	else
+	} else {
+		u32 crc_erase_value = fw->crc_fixed_value;
+		u32 crc_val = 0;
+
+		ret = lxs_hal_oled_fwup_flash_crc(ts, &crc_val);
+		if (ret < 0) {
+			t_dev_err(ts->dev, "%s: failed - flash	erase crc, %d\n", __func__, ret);
+			goto done;
+		}
+
+		if (crc_val != crc_erase_value) {
+			t_dev_err(ts->dev, "%s: flash erase crc error %08Xh != %08Xh, %d\n",
+				__func__, crc_erase_value, crc_val, ret);
+			ret = -EFAULT;
+			goto done;
+		}
+
 		t_dev_info(ts->dev, "FW upgrade: flash mass erase done\n");
+	}
+
+done:
+	return ret;
+}
+
+static int __oled_fwup_flash_erase(struct lxs_ts *ts)
+{
+	int i;
+	int ret = 0;
+
+	for (i = 0; i < 3; i++) {
+		ret = __oled_fwup_flash_erjob(ts);
+		if (ret >= 0)
+			break;
+	}
 
 	return ret;
 }
@@ -755,7 +785,7 @@ static int lxs_hal_oled_fwup_fw_core(struct lxs_ts *ts, u8 *dn_buf, int dn_size)
 	int ret = 0;
 	int (*fw_flash_con)(struct lxs_ts *ts, int fw_addr, int curr_size);
 
-	buf_size = min(FW_DN_LOG_UNIT, (int)lxs_hal_fw_act_buf_size(ts));
+	buf_size = min_t(int, FW_DN_LOG_UNIT, lxs_hal_fw_act_buf_size(ts));
 
 	fw_flash_con = __oled_fwup_flash_con;
 
@@ -763,14 +793,13 @@ static int lxs_hal_oled_fwup_fw_core(struct lxs_ts *ts, u8 *dn_buf, int dn_size)
 	case 3:
 		fw_flash_con = __oled_fwup_flash_con_t3;
 
-		buf_size = min(TS_MAX_BUF_SIZE, (int)lxs_hal_fw_act_buf_size(ts));
+		buf_size = min_t(int, TS_MAX_BUF_SIZE, lxs_hal_fw_act_buf_size(ts));
 		dn_wr_en_pre = 1;
 		flash_sts = 1;
 		break;
 	case 2:
 		dn_wr_en_mid = 1;
-		/* fall through */
-		fallthrough;
+		fallthrough;	/* fall through */
 	case 1:
 		ret = lxs_hal_oled_fwup_rst_ctl(ts, 2, "flash write");
 		if (ret < 0)
@@ -778,7 +807,7 @@ static int lxs_hal_oled_fwup_fw_core(struct lxs_ts *ts, u8 *dn_buf, int dn_size)
 		break;
 	}
 
-	dn_log_unit = min(FW_DN_LOG_UNIT, buf_size);
+	dn_log_unit = min_t(int, FW_DN_LOG_UNIT, buf_size);
 
 	if (dn_wr_en_pre) {
 		ret = lxs_hal_oled_fwup_flash_prot_con(ts, 1);
@@ -1129,12 +1158,11 @@ static int __used lxs_hal_oled_fwup_upgrade(struct lxs_ts *ts,
 	u32 include_conf = !!(fw_size > fw_size_max);
 	int ret = 0;
 
-	if (!retry) {
+	if (!retry)
 		lxs_hal_oled_fwup_setup(ts);
-	}
 
-	t_dev_info(ts->dev, "FW upgrade:%s include conf data\n",
-			(include_conf) ? "" : " not");
+	if (include_conf)
+		t_dev_info(ts->dev, "%s\n", "FW upgrade: include spare data");
 
 	t_dev_dbg_fwup(ts->dev, "FW upgrade: fw size %08Xh, fw_size_max %08Xh\n",
 			fw_size, fw_size_max);
@@ -1163,10 +1191,6 @@ static int __used lxs_hal_oled_fwup_upgrade(struct lxs_ts *ts,
 	if (ret < 0) {
 		lxs_hal_set_fwup_status(ts, FWUP_STATUS_NG_CODE);
 		goto out;
-	}
-
-	if (include_conf) {
-		/* TBD */
 	}
 
 	ret = lxs_hal_oled_fwup_post(ts);
@@ -1288,7 +1312,7 @@ static int __used lxs_hal_fw_compare(struct lxs_ts *ts, u8 *fw_buf)
 	}
 
 	if (((bin_ver_offset + 4) > fw_max_size) ||
-		((bin_pid_offset + 8) > fw_max_size)) {
+		((bin_pid_offset + fw->pid_lim) > fw_max_size)) {
 		t_dev_err(ts->dev, "%s: invalid offset - ver %06Xh, pid %06Xh, max %06Xh\n",
 			__func__, bin_ver_offset, bin_pid_offset, fw_max_size);
 		return -EINVAL;
@@ -1297,7 +1321,7 @@ static int __used lxs_hal_fw_compare(struct lxs_ts *ts, u8 *fw_buf)
 	t_dev_dbg_fwup(ts->dev, "ver %06Xh, pid %06Xh\n",
 		bin_ver_offset, bin_pid_offset);
 
-	memcpy(pid, &fw_buf[bin_pid_offset], 8);
+	memcpy(pid, &fw_buf[bin_pid_offset], fw->pid_lim);
 	t_dev_dbg_fwup(ts->dev, "pid %s\n", pid);
 
 	if (lxs_hal_fw_check_pid(pid)) {
@@ -1337,9 +1361,9 @@ static int __used lxs_hal_fw_compare(struct lxs_ts *ts, u8 *fw_buf)
 		if (use_fw_ver_diff) {
 			u32 bin_ver_val = (bin_major<<16) | (bin_minor<<8) | bin_build;
 			u32 dev_ver_val = (dev_major<<16) | (dev_minor<<8) | dev_build;
-			if (bin_ver_val != dev_ver_val) {
+
+			if (bin_ver_val != dev_ver_val)
 				update |= BIT(8);
-			}
 		} else {
 			update |= lxs_hal_fw_ver_cmp(bin_major, bin_minor, bin_build,
 						dev_major, dev_minor, dev_build);
@@ -1351,7 +1375,7 @@ static int __used lxs_hal_fw_compare(struct lxs_ts *ts, u8 *fw_buf)
 		goto out;
 	}
 
-#if 0	/* requires more consideration */
+#if defined(__DBG_FW_PID_CHK)	/* requires more consideration */
 	if (fw->invalid_pid) {
 		t_dev_warn(ts->dev,
 			"FW compare: dev-pid is invalid, skip pid check\n");
@@ -1359,7 +1383,7 @@ static int __used lxs_hal_fw_compare(struct lxs_ts *ts, u8 *fw_buf)
 	}
 #endif
 
-	if (memcmp(pid, fw->product_id, 8)) {
+	if (memcmp(pid, fw->product_id, fw->pid_lim)) {
 		if (fw->invalid_pid) {
 			t_dev_err(ts->dev,
 				"%s: bin-pid[%s], dev-pid invalid, halted (up %02X, fup %02X)\n",
@@ -1382,18 +1406,12 @@ out:
 	return update;
 }
 
-static int lxs_hal_fw_do_get_fw_abs(struct lxs_ts *ts,
-			const struct firmware **fw_p, const char *name)
-{
-	return -EIO;
-}
-
 static int lxs_hal_fw_do_get_file(struct lxs_ts *ts,
 			const struct firmware **fw_p,
 			const char *name, int abs_path)
 {
 	if (abs_path)
-		return lxs_hal_fw_do_get_fw_abs(ts, fw_p, name);
+		return -EIO;
 
 	return request_firmware(fw_p, name, ts->dev);
 }
@@ -1474,20 +1492,11 @@ static void lxs_hal_fw_release_firm(struct lxs_ts *ts,
 {
 	struct lxs_ts_chip *chip = &ts->chip;
 
-	if (fw == NULL) {
+	if (fw == NULL)
 		return;
-	}
 
-	if (chip->fw_abs_path) {
-		chip->fw_abs_path = 0;
-	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
-		vfree(fw->data);
-	#else
-		kfree(fw->data);
-	#endif
-		kfree(fw);
+	if (chip->fw_abs_path)
 		return;
-	}
 
 	release_firmware(fw);
 }
@@ -1582,7 +1591,7 @@ out:
 	return ret;
 }
 
-int lxs_hal_upgrade(struct lxs_ts *ts)
+static int lxs_hal_do_upgrade(struct lxs_ts *ts, u8 *fdata, int fsize)
 {
 	struct lxs_ts_chip *chip = &ts->chip;
 	struct lxs_hal_fwup_ops *fwup_ops = &chip->fwup_ops;
@@ -1619,6 +1628,13 @@ int lxs_hal_upgrade(struct lxs_ts *ts)
 
 	t_dev_info(ts->dev, "fw type: %s\n", FW_TYPE_STR);
 
+	if (fdata && fsize) {
+		t_dev_info(ts->dev, "getting fw from fdata\n");
+		fw_buf = fdata;
+		fw_size = fsize;
+		goto use_fdata;
+	}
+
 	t_dev_info(ts->dev, "getting fw from file\n");
 	ret = lxs_hal_fw_get_file(ts, &fw, fwpath);
 	if (ret < 0) {
@@ -1627,6 +1643,8 @@ int lxs_hal_upgrade(struct lxs_ts *ts)
 	}
 	fw_buf = (u8 *)fw->data;
 	fw_size = (int)fw->size;
+
+use_fdata:
 
 //	ret = -EINVAL;
 	ret = -EPERM;
@@ -1686,4 +1704,12 @@ out:
 	return ret;
 }
 
+int lxs_hal_upgrade(struct lxs_ts *ts)
+{
+	return lxs_hal_do_upgrade(ts, NULL, 0);
+}
 
+int lxs_hal_upfdata(struct lxs_ts *ts, u8 *fdata, int fsize)
+{
+	return lxs_hal_do_upgrade(ts, fdata, fsize);
+}
