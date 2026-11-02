@@ -1,12 +1,8 @@
 /*
- * Copyright 2024 Sony Corporation.
+ * SPDX-License-Identifier: GPL-2.0
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
-// SPDX-License-Identifier: GPL-2.0
-/*
+ * lxs_ts_sysfs.c
+ *
  * LXS touch sysfs control
  *
  * This program is free software; you can redistribute it and/or modify
@@ -44,13 +40,20 @@ static int __show_reg_list(struct device *dev, char *buf, int size)
 	size += _reg_snprintf(buf, size, reg, tc_product_id1);
 	size += _reg_snprintf(buf, size, reg, tc_product_id2);
 	size += _reg_snprintf(buf, size, reg, info_chip_version);
+	size += _reg_snprintf(buf, size, reg, info_lot_num);
+	size += _reg_snprintf(buf, size, reg, info_serial_num);
+	size += _reg_snprintf(buf, size, reg, info_date);
+	size += _reg_snprintf(buf, size, reg, info_time);
 	size += _reg_snprintf(buf, size, reg, code_access_addr);
-	size += _reg_snprintf(buf, size, reg, serial_data_offset);
 	size += _reg_snprintf(buf, size, reg, data_base_addr);
+	size += _reg_snprintf(buf, size, reg, prd_tcm_base_addr);
 	size += _reg_snprintf(buf, size, reg, tc_device_ctl);
 	if (!lxs_addr_is_invalid(reg->tc_drive_ctl))
 		size += _reg_snprintf(buf, size, reg, tc_drive_ctl);
 
+	size += _reg_snprintf(buf, size, reg, cmd_raw_data_report_mode_read);
+	size += _reg_snprintf(buf, size, reg, cmd_raw_data_compress_write);
+	size += _reg_snprintf(buf, size, reg, cmd_raw_data_report_mode_write);
 	size += _reg_snprintf(buf, size, reg, res_info);
 	size += _reg_snprintf(buf, size, reg, channel_info);
 	size += _reg_snprintf(buf, size, reg, t_frame_rate);
@@ -67,17 +70,23 @@ static int __show_reg_list(struct device *dev, char *buf, int size)
 
 	size += _reg_snprintf(buf, size, reg, tc_tsp_test_ctl);
 	size += _reg_snprintf(buf, size, reg, tc_tsp_test_status);
-	size += _reg_snprintf(buf, size, reg, tc_tsp_test_result);
+	size += _reg_snprintf(buf, size, reg, tc_tsp_test_pf_result);
+	size += _reg_snprintf(buf, size, reg, tc_tsp_test_off_info);
 	size += _reg_snprintf(buf, size, reg, tc_flash_dn_status);
 	size += _reg_snprintf(buf, size, reg, tc_confdn_base_addr);
 	size += _reg_snprintf(buf, size, reg, tc_flash_dn_ctl);
+	size += _reg_snprintf(buf, size, reg, raw_data_ctl_read);
+	size += _reg_snprintf(buf, size, reg, raw_data_ctl_write);
+	size += _reg_snprintf(buf, size, reg, serial_data_offset);
 
-	size += _reg_snprintf(buf, size, reg, prd_ic_start_reg);
-	size += _reg_snprintf(buf, size, reg, prd_ic_readystatus);
-
-	size += _reg_snprintf(buf, size, reg, abt_report_mode_read);
-	size += _reg_snprintf(buf, size, reg, abt_report_mode_write);
-	size += _reg_snprintf(buf, size, reg, abt_compress_write);
+	size += _reg_snprintf(buf, size, reg, prd_serial_tcm_offset);
+	size += _reg_snprintf(buf, size, reg, prd_tc_mem_sel);
+	size += _reg_snprintf(buf, size, reg, prd_tc_test_mode_ctl);
+	size += _reg_snprintf(buf, size, reg, prd_m1_m2_raw_offset);
+	size += _reg_snprintf(buf, size, reg, prd_tune_result_offset);
+	size += _reg_snprintf(buf, size, reg, prd_open3_short_offset);
+	size += _reg_snprintf(buf, size, reg, prd_ic_ait_start_reg);
+	size += _reg_snprintf(buf, size, reg, prd_ic_ait_data_readystatus);
 
 	/* __LXS_FW_TYPE_OLED_BASE */
 	if (chip->opt.t_oled) {
@@ -95,9 +104,9 @@ static int __show_reg_list(struct device *dev, char *buf, int size)
 		size += _reg_snprintf_fw(buf, size, fw, flash_status);
 		size += _reg_snprintf_fw(buf, size, fw, bdma_saddr);
 		size += _reg_snprintf_fw(buf, size, fw, bdma_daddr);
-		if (fw->bdma_cal_op)
+		if (fw->bdma_cal_op) {
 			size += _reg_snprintf_fw(buf, size, fw, bdma_cal_op);
-
+		}
 		size += _reg_snprintf_fw(buf, size, fw, bdma_ctrl);
 		size += _reg_snprintf_fw(buf, size, fw, bdma_start);
 		size += _reg_snprintf_fw(buf, size, fw, bdma_sts);
@@ -124,10 +133,6 @@ static ssize_t show_reg_list(struct device *dev, char *buf)
 	size += __show_reg_list(dev, buf, size);
 
 	size += lxs_snprintf(buf, size, "\n");
-
-	if (chip->opt.t_uni_id)
-		size += lxs_snprintf(buf, size,
-				">> unique id  : %s\n", chip->uni_id_str);
 
 	size += lxs_snprintf(buf, size,
 				">> version    : v%u.%02u, chip : %u, protocol : %u\n",
@@ -163,7 +168,6 @@ static ssize_t show_reg_list(struct device *dev, char *buf)
 
 	return (ssize_t)size;
 }
-static TS_ATTR(reg_list, show_reg_list, NULL);
 
 static int __show_reg_ctrl_log_history(struct lxs_ts *ts, char *buf)
 {
@@ -248,7 +252,7 @@ static int __store_reg_ctrl_rd_burst(struct lxs_ts *ts, u32 addr, int size, int 
 
 	size = min(size, REG_BURST_MAX);
 
-	rd_buf = kzalloc(size, GFP_KERNEL);
+	rd_buf = (u8 *)kzalloc(size, GFP_KERNEL);
 	if (rd_buf == NULL) {
 		t_dev_err(ts->dev, "failed to allocate rd_buf\n");
 		return -ENOMEM;
@@ -358,7 +362,6 @@ static ssize_t store_reg_ctrl(struct device *dev,
 out:
 	return count;
 }
-static TS_ATTR(reg_ctrl, show_reg_ctrl, store_reg_ctrl);
 
 static ssize_t show_reset_ctrl(struct device *dev, char *buf)
 {
@@ -375,6 +378,10 @@ static ssize_t show_reset_ctrl(struct device *dev, char *buf)
 				" HW Reset(Sync)  : echo %d > hal_reset_ctrl\n",
 				TC_HW_RESET_SYNC);
 
+	size += lxs_snprintf(buf, size,
+				" HW Reset(Cond)  : echo 0x%X > hal_reset_ctrl\n",
+				TC_HW_RESET_COND);
+
 	return size;
 }
 
@@ -384,32 +391,16 @@ static ssize_t store_reset_ctrl(struct device *dev,
 	struct lxs_ts *ts = dev_get_drvdata(dev);
 	int type = 0;
 
-	if (kstrtoint(buf, 16, &type))
+	if (sscanf(buf, "%X", &type) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: type 0x%X\n", __func__, type);
 
-	if (work_busy(&ts->upgrade_work.work)) {
-		t_dev_warn(ts->dev, "%s: fw upgrade is ongoing\n", __func__);
-		return count;
-	}
-
-	if (type & 0x100) {
-		struct lxs_ts_chip *chip = &ts->chip;
-
-		mutex_lock(&ts->lock);
-		if (!chip->reset_is_on_going)
-			chip->boot_fail_cnt = 0;
-		mutex_unlock(&ts->lock);
-
-		type &= ~0x100;
-	}
-
-	lxs_hal_reset(ts, type, !!(ts->state_sleep == TS_IC_SLEEP));
+	if (type != TC_HW_RESET_COND)
+		lxs_hal_reset(ts, type, 0);
 
 	return count;
 }
-static TS_ATTR(reset_ctrl, show_reset_ctrl, store_reset_ctrl);
 
 static ssize_t show_debug_tc_cmd(struct device *dev, char *buf)
 {
@@ -489,7 +480,6 @@ static ssize_t store_debug_tc_cmd(struct device *dev,
 out:
 	return count;
 }
-static TS_ATTR(debug_tc_cmd, show_debug_tc_cmd, store_debug_tc_cmd);
 
 static ssize_t show_debug_power(struct device *dev, char *buf)
 {
@@ -509,7 +499,7 @@ static ssize_t store_debug_power(struct device *dev,
 	struct lxs_ts *ts = dev_get_drvdata(dev);
 	int ctrl = 0;
 
-	if (kstrtoint(buf, 10, &ctrl))
+	if (sscanf(buf, "%d", &ctrl) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: ctrl %d\n", __func__, ctrl);
@@ -524,7 +514,21 @@ static ssize_t store_debug_power(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(debug_power, show_debug_power, store_debug_power);
+
+static ssize_t show_fwup_status(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int fwup_status = lxs_hal_get_fwup_status(ts);
+	const char *str = lxs_fwup_status_str(fwup_status);
+	int size = 0;
+
+	if (fwup_status != FWUP_STATUS_BUSY)
+		t_dev_info(dev, "fwup_status: %d(%s)\n", fwup_status, str);
+
+	size += lxs_snprintf(buf, size, "%d\n", fwup_status);
+
+	return (ssize_t)size;
+}
 
 static int __get_version(struct device *dev, char *buf, int flag)
 {
@@ -538,19 +542,13 @@ static int __get_version(struct device *dev, char *buf, int flag)
 	if (!flag)
 		return 0;
 
-	if (flag & TS_GET_CHIP_NAME) {
+	if (flag & TS_GET_CHIP_NAME)
 		offset += lxs_snprintf(buf, offset,
 					"chip : %s\n",
 					ts->chip_name);
 
-		if (chip->opt.t_uni_id)
-			offset += lxs_snprintf(buf, offset,
-					"unique id : %s\n", chip->uni_id_str);
-	}
-
 	if (flag & (TS_GET_VERSION|TS_GET_VER_SIMPLE)) {
 		char *ver_tag = (flag & TS_GET_VER_SIMPLE) ? "" : "version : ";
-
 		offset += lxs_snprintf(buf, offset,
 					"%sv%u.%02u\n",
 					ver_tag,
@@ -578,13 +576,11 @@ static ssize_t show_version(struct device *dev, char *buf)
 {
 	return __get_version(dev, (char *)buf, TS_GET_ALL);
 }
-static TS_ATTR(version, show_version, NULL);
 
 static ssize_t show_version_no(struct device *dev, char *buf)
 {
 	return __get_version(dev, (char *)buf, TS_GET_VER_SIMPLE);
 }
-static TS_ATTR(version_no, show_version_no, NULL);
 
 static ssize_t show_lpwg_data(struct device *dev, char *buf)
 {
@@ -611,7 +607,6 @@ static ssize_t show_lpwg_data(struct device *dev, char *buf)
 
 	return size;
 }
-static TS_ATTR(lpwg_data, show_lpwg_data, NULL);
 
 static ssize_t show_channel_info(struct device *dev, char *buf)
 {
@@ -630,7 +625,6 @@ static ssize_t show_channel_info(struct device *dev, char *buf)
 
 	return (ssize_t)size;
 }
-static TS_ATTR(channel_info, show_channel_info, NULL);
 
 static ssize_t show_glove_state(struct device *dev, char *buf)
 {
@@ -655,7 +649,7 @@ static ssize_t store_glove_state(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%X", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -670,7 +664,6 @@ static ssize_t store_glove_state(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(glove_status, show_glove_state, store_glove_state);
 
 static ssize_t show_grab_state(struct device *dev, char *buf)
 {
@@ -695,7 +688,7 @@ static ssize_t store_grab_state(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%X", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -710,7 +703,6 @@ static ssize_t store_grab_state(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(grab_status, show_grab_state, store_grab_state);
 
 static ssize_t show_usb_state(struct device *dev, char *buf)
 {
@@ -728,7 +720,7 @@ static ssize_t store_usb_state(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		goto out;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -737,14 +729,13 @@ static ssize_t store_usb_state(struct device *dev,
 
 	ts->state_connect = value;
 
-	lxs_hal_connect(ts);
+	lxs_hal_usb_status(ts);
 
 	mutex_unlock(&ts->lock);
 
 out:
 	return count;
 }
-static TS_ATTR(usb_status, show_usb_state, store_usb_state);
 
 static ssize_t show_wireless_state(struct device *dev, char *buf)
 {
@@ -762,23 +753,22 @@ static ssize_t store_wireless_state(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		goto out;
 
-	t_dev_info(dev, "%s: value 0x%X\n", __func__, value);
+	t_dev_info(dev, "%s: value %d\n", __func__, value);
 
 	mutex_lock(&ts->lock);
 
 	ts->state_wireless = value;
 
-	lxs_hal_connect(ts);
+	lxs_hal_wireless_status(ts);
 
 	mutex_unlock(&ts->lock);
 
 out:
 	return count;
 }
-static TS_ATTR(wirelss_status, show_wireless_state, store_wireless_state);
 
 static ssize_t show_ime_state(struct device *dev, char *buf)
 {
@@ -796,7 +786,7 @@ static ssize_t store_ime_state(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		goto out;
 
 	if ((value < TS_IME_OFF) || (value > TS_IME_SWYPE)) {
@@ -820,7 +810,6 @@ static ssize_t store_ime_state(struct device *dev,
 out:
 	return count;
 }
-static TS_ATTR(ime_status, show_ime_state, store_ime_state);
 
 static ssize_t show_incoming_call(struct device *dev, char *buf)
 {
@@ -838,7 +827,7 @@ static ssize_t store_incoming_call(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -860,32 +849,177 @@ static ssize_t store_incoming_call(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(incoming_call, show_incoming_call, store_incoming_call);
 
-static ssize_t show_frame_rate(struct device *dev, char *buf)
+static ssize_t show_frame_table(struct device *dev, char *buf)
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
+	char *sbuf = NULL;
+	int *d_frame_tbl_np = ts->d_frame_tbl_np;
+	int *d_frame_tbl_lp = ts->d_frame_tbl_lp;
+	int *t_frame_tbl_np = ts->t_frame_tbl_np;
+	int *t_frame_tbl_lp = ts->t_frame_tbl_lp;
+	int slen = 128;
+	int size = 0;
+	int l_sz = 0;
+	int val = 0;
+	int i;
 
-	return lxs_snprintf(buf, 0, "%d\n", ts->d_frame_rate);
+	sbuf = (char *)kzalloc(slen, GFP_KERNEL);
+	if (sbuf == NULL)
+		return (size_t)size;
+
+	l_sz = __lxs_snprintf(sbuf, slen, 0, "d: np ");
+	for (i = 0; i < TS_FRAME_TBL_SZ; i++) {
+		val = *d_frame_tbl_np++;
+		if (val < 0)
+			break;
+		l_sz += __lxs_snprintf(sbuf, slen, l_sz, "%d ", val);
+	}
+
+	l_sz += __lxs_snprintf(sbuf, slen, l_sz, "| lp ");
+	for (i = 0; i < TS_FRAME_TBL_SZ; i++) {
+		val = *d_frame_tbl_lp++;
+		if (val < 0)
+			break;
+		l_sz += __lxs_snprintf(sbuf, slen, l_sz, "%d ", val);
+	}
+
+	l_sz += __lxs_snprintf(sbuf, slen, l_sz, "(off %d, aod %d)",
+		ts->d_frame_rate_off, ts->d_frame_rate_aod);
+
+	size += lxs_snprintf(buf, size, "%s\n", sbuf);
+	t_dev_info(dev, "%s: %s\n", __func__, sbuf);
+
+	memset(sbuf, 0, slen);
+	l_sz = __lxs_snprintf(sbuf, slen, 0, "t: np ");
+	for (i = 0; i < TS_FRAME_TBL_SZ; i++) {
+		val = *t_frame_tbl_np++;
+		if (val < 0)
+			break;
+		l_sz += __lxs_snprintf(sbuf, slen, l_sz, "%d ", val);
+	}
+
+	l_sz += __lxs_snprintf(sbuf, slen, l_sz, "| lp ");
+	for (i = 0; i < TS_FRAME_TBL_SZ; i++) {
+		val = *t_frame_tbl_lp++;
+		if (val < 0)
+			break;
+		l_sz += __lxs_snprintf(sbuf, slen, l_sz, "%d ", val);
+	}
+
+	size += lxs_snprintf(buf, size, "%s\n", sbuf);
+	t_dev_info(dev, "%s: %s\n", __func__, sbuf);
+
+	kfree(sbuf);
+
+	return (size_t)size;
 }
 
-static ssize_t store_frame_rate(struct device *dev,
-				const char *buf, size_t count)
+static ssize_t __show_frame_rate(struct device *dev, char *buf, int mode)
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
-	int value = 0;
+	int d_rate = (mode == LCD_MODE_U3) ? ts->d_frame_rate_np : ts->d_frame_rate_lp;
+	int t_rate = (mode == LCD_MODE_U3) ? ts->t_frame_rate_np : ts->t_frame_rate_lp;
+	int size = 0;
 
-	if (kstrtoint(buf, 10, &value))
+	t_dev_info(dev, "%s: disp %d, touch %d\n", __func__, d_rate, t_rate);
+
+	size += lxs_snprintf(buf, size, "%d,%d\n", d_rate, t_rate);
+
+	return (ssize_t)size;
+}
+
+static ssize_t __store_frame_rate(struct device *dev,
+				const char *buf, size_t count, int mode)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	struct lxs_ts_chip *chip = &ts->chip;
+	int is_u3 = (mode == LCD_MODE_U3);
+	char *str = (is_u3) ? "NP" : "LP";
+	int *d_frame_rate = (is_u3) ? &ts->d_frame_rate_np : &ts->d_frame_rate_lp;
+	int *t_frame_rate = (is_u3) ? &ts->t_frame_rate_np : &ts->t_frame_rate_lp;
+	int *d_frame_tbl = (is_u3) ? ts->d_frame_tbl_np : ts->d_frame_tbl_lp;
+	int *t_frame_tbl = (is_u3) ? ts->t_frame_tbl_np : ts->t_frame_tbl_lp;
+	int d_idx = 0;
+	int t_idx = 0;
+	int d_idx_old = 0;
+	int t_idx_old = 0;
+	int tc_driving = 1;
+	int d_valid = 0;
+	int t_valid = 0;
+
+	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	t_dev_info(dev, "%s: value %d\n", __func__, value);
+	if (sscanf(buf, "%d %d", &d_idx, &t_idx) <= 0)
+		return count;
 
-	if (ts->fquirks->fps_update)
-		ts->fquirks->fps_update(ts, value);
+	d_valid = (touch_lookup_frame_tbl(d_frame_tbl, d_idx) >= 0);
+	if (!d_valid)
+		t_dev_err(dev, "%s: %s: invalid display frame rate index %d\n",
+			__func__, str, d_idx);
+
+	t_valid = (touch_lookup_frame_tbl(t_frame_tbl, t_idx) >= 0);
+	if (!t_valid)
+		t_dev_err(dev, "%s: %s: invalid touch frame rate index %d\n",
+			__func__, str, t_idx);
+
+	if (!d_valid || !t_valid)
+		return count;
+
+	if ((*d_frame_rate == d_idx) && (*t_frame_rate == t_idx)) {
+		t_dev_info(dev, "%s: disp_index %d, touch_index %d\n",
+			__func__, d_idx, t_idx);
+		return count;
+	}
+
+	mutex_lock(&ts->lock);
+
+	d_idx_old = *d_frame_rate;
+	t_idx_old = *t_frame_rate;
+
+	*d_frame_rate = d_idx;
+	*t_frame_rate = t_idx;
+
+	t_dev_info(dev, "%s: %s disp_index %d(%d), touch_index %d(%d)\n",
+		__func__, str, d_idx, d_idx_old, t_idx, t_idx_old);
+
+	if (!ts->probe_done || ts->after_probe.err)
+		tc_driving = 0;
+	else if (mode != chip->driving_mode)
+		tc_driving = 0;
+
+	if (tc_driving)
+		lxs_hal_tc_driving(ts, -1);
+	else
+		t_dev_info(dev, "%s: skip tc_driving\n", __func__);
+
+	mutex_unlock(&ts->lock);
 
 	return count;
 }
-static TS_ATTR(frame_rate, show_frame_rate, store_frame_rate);
+
+static ssize_t show_frame_rate_np(struct device *dev, char *buf)
+{
+	return __show_frame_rate(dev, buf, LCD_MODE_U3);
+}
+
+static ssize_t store_frame_rate_np(struct device *dev,
+				const char *buf, size_t count)
+{
+	return __store_frame_rate(dev, buf, count, LCD_MODE_U3);
+}
+
+static ssize_t show_frame_rate_lp(struct device *dev, char *buf)
+{
+	return __show_frame_rate(dev, buf, LCD_MODE_U0);
+}
+
+static ssize_t store_frame_rate_lp(struct device *dev,
+				const char *buf, size_t count)
+{
+	return __store_frame_rate(dev, buf, count, LCD_MODE_U0);
+}
 
 /*
  * U0   : echo 0 > enabled
@@ -909,7 +1043,7 @@ static ssize_t store_enable(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -933,18 +1067,17 @@ static ssize_t store_enable(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(enable, show_enable, store_enable);
 
 #if defined(__LXS_SUPPORT_LPWG)
-static ssize_t show_enable_aod(struct device *dev, char *buf)
+static ssize_t show_enable_lpm(struct device *dev, char *buf)
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
 	struct lxs_ts_chip *chip = &ts->chip;
 
-	return lxs_snprintf(buf, 0, "%d\n", chip->enable_aod);
+	return lxs_snprintf(buf, 0, "%d\n", chip->enable_lpm);
 }
 
-static ssize_t store_enable_aod(struct device *dev,
+static ssize_t store_enable_lpm(struct device *dev,
 				const char *buf, size_t count)
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
@@ -954,7 +1087,7 @@ static ssize_t store_enable_aod(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	if (!ts->plat_data->use_lpwg) {
@@ -964,15 +1097,14 @@ static ssize_t store_enable_aod(struct device *dev,
 
 	mutex_lock(&ts->lock);
 
-	chip->enable_aod = value;
+	chip->enable_lpm = value;
 
-	t_dev_info(dev, "enable_aod: %d\n", chip->enable_aod);
+	t_dev_info(dev, "set_lowpower_mode: %d\n", chip->enable_lpm);
 
 	mutex_unlock(&ts->lock);
 
 	return count;
 }
-static TS_ATTR(enable_aod, show_enable_aod, store_enable_aod);
 
 static ssize_t show_enable_knock(struct device *dev, char *buf)
 {
@@ -992,7 +1124,7 @@ static ssize_t store_enable_knock(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	if (!ts->plat_data->use_lpwg) {
@@ -1010,10 +1142,8 @@ static ssize_t store_enable_knock(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(enable_knock, show_enable_knock, store_enable_knock);
-#endif	/* __LXS_SUPPORT_LPWG */
+#endif
 
-#if defined(__LXS_SUPPORT_PROX)
 static ssize_t show_enable_prox(struct device *dev, char *buf)
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
@@ -1032,7 +1162,7 @@ static ssize_t store_enable_prox(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	mutex_lock(&ts->lock);
@@ -1045,8 +1175,318 @@ static ssize_t store_enable_prox(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(enable_prox, show_enable_prox, store_enable_prox);
-#endif	/* __LXS_SUPPORT_PROX */
+
+static ssize_t after_probe_start_store(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+
+	t_dev_info(dev, "after probe start \n");
+	if (ts->probe_done) {
+		t_dev_info(dev, "already post probed, need reboot\n");
+	} else {
+		t_dev_info(dev, "start init work\n");
+		queue_delayed_work(ts->wq, &ts->after_probe.start, 0);
+	}
+
+	return count;
+}
+
+static ssize_t show_rejection_mode(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+
+	t_dev_info(ts->dev, "rejection_mode: mode %d, flag %d\n",
+		ts->rejection_mode, ts->report_rejected_event_flag);
+
+	return lxs_snprintf(buf, 0, "mode %d, flag %d\n",
+		ts->rejection_mode, ts->report_rejected_event_flag);
+}
+
+static ssize_t store_rejection_mode(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int value, old;
+
+	if (sscanf(buf, "%d", &value) <= 0)
+		return count;
+
+	if (value < 0 || value > 1) {
+		t_dev_err(dev, "rejection_mode: param out of range\n");
+		return count;
+	}
+
+	mutex_lock(&ts->lock);
+
+	old = ts->rejection_mode;
+	ts->rejection_mode = value;
+
+	ts->report_rejected_event_flag = (value) ? false : true;
+
+	t_dev_info(dev, "rejection_mode: mode %d(%d), flag %d\n",
+		ts->rejection_mode, old, ts->report_rejected_event_flag);
+
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static ssize_t show_orientation_change(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+
+	t_dev_info(ts->dev, "orientation_change: landscape %d\n", ts->landscape);
+
+	return lxs_snprintf(buf, 0, "landscape %d\n", ts->landscape);
+}
+
+static ssize_t store_orientation_change(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	struct lxs_ts_chip *chip = &ts->chip;
+	int value, old;
+
+	if (sscanf(buf, "%d", &value) <= 0)
+		return count;
+
+	if (value < 0 || value > 1) {
+		t_dev_err(dev, "orientation_change: param out of range\n");
+		return count;
+	}
+
+	mutex_lock(&ts->lock);
+
+	old = ts->landscape;
+	ts->landscape = value;
+
+	t_dev_info(dev, "orientation_change: landscape %d(%d)\n",
+		ts->landscape, old);
+
+	chip->grab = !value;
+	lxs_hal_tc_con(ts, TCON_GRAB, NULL);
+
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static void update_game_enhancer_grip_rejection_para(struct lxs_ts *ts, bool portrait, int location, int value)
+{
+	int portrait_offset = 4;
+
+	if (portrait) {
+		location -= portrait_offset;
+		ts->radius_portrait[location] = value;
+		ts->circle_range_p[location] = value * value;
+
+		t_dev_info(ts->dev, "%s: radius_portrait[%d] = %d\n",
+			__func__, location, value);
+		t_dev_info(ts->dev, "%s: circle_range_p[%d] = %d\n",
+			__func__, location, value * value);
+	} else {
+		ts->radius_landscape[location] = value;
+		ts->circle_range_l[location] = value * value;
+
+		t_dev_info(ts->dev, "%s: radius_landscape[%d] = %d\n",
+			__func__, location, value);
+		t_dev_info(ts->dev, "%s: circle_range_l[%d] = %d\n",
+			__func__, location, value * value);
+	}
+}
+
+static void update_grip_rejection_para(struct lxs_ts *ts, int *value)
+{
+	int i;
+
+	if (value[0] == 6) {
+		memcpy(ts->portrait_buffer, value + 1, sizeof(ts->portrait_buffer));
+		for (i = 0; i < ARRAY_SIZE(ts->portrait_buffer); i++) {
+			t_dev_info(ts->dev, "%s: portrait_buffer[%d] = %d\n",
+				__func__, i, ts->portrait_buffer[i]);
+		}
+	} else {
+		memcpy(ts->landscape_buffer, value + 1, sizeof(ts->landscape_buffer));
+		for (i = 0; i < ARRAY_SIZE(ts->landscape_buffer); i++) {
+			t_dev_info(ts->dev, "%s: landscape_buffer[%d] = %d\n",
+				__func__, i, ts->landscape_buffer[i]);
+		}
+	}
+}
+
+static int __show_range_changer_log_func(struct lxs_ts *ts, char *pbuf, int psize,
+			char *name, u32 *data, int len)
+{
+	char sbuf[64] = { 0, };
+	int slen = 0;
+	char *estr = ",";
+	int i;
+
+	for (i = 0; i < len; i++) {
+		if (i == (len - 1))
+			estr = "";
+		slen += snprintf(sbuf + slen, sizeof(sbuf) - slen, "%d%s", data[i], estr);
+	}
+
+	t_dev_info(ts->dev, "range_changer: %18s[0...%d] = %s\n", name, len-1, sbuf);
+
+	return lxs_snprintf(pbuf, psize, "%18s[0...%d] = %s\n", name, len-1, sbuf);
+}
+
+#define __show_range_changer_log(_ts, _pbuf, _psize, _name)	\
+		__show_range_changer_log_func(_ts, _pbuf, _psize, #_name, _ts->_name, ARRAY_SIZE(_ts->_name))
+
+static ssize_t show_range_changer(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int size = 0;
+
+	size += __show_range_changer_log(ts, buf, size, portrait_buffer);
+
+	size += __show_range_changer_log(ts, buf, size, radius_portrait);
+
+	size += __show_range_changer_log(ts, buf, size, circle_range_p);
+
+	size += __show_range_changer_log(ts, buf, size, landscape_buffer);
+
+	size += __show_range_changer_log(ts, buf, size, radius_landscape);
+
+	size += __show_range_changer_log(ts, buf, size, circle_range_l);
+
+	return (ssize_t)size;
+}
+
+static ssize_t store_range_changer(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int value[5] = {0, };
+
+	if (sscanf(buf, "%d, %d, %d, %d, %d", &value[0], &value[1], &value[2], &value[3], &value[4]) <= 0)
+		return count;
+
+	if (value[0] < 0|| value[0] > 7) {
+		t_dev_err(dev, "range_changer: param out of range\n");
+		return count;
+	}
+
+	mutex_lock(&ts->lock);
+
+	if (value[0] <= 3)
+		update_game_enhancer_grip_rejection_para(ts, false, value[0], value[1]);
+	else if (value[0] <= 5)
+		update_game_enhancer_grip_rejection_para(ts, true, value[0], value[1]);
+	else
+		update_grip_rejection_para(ts, value);
+
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+#if defined(__LXS_SUPPORT_FILTER_CON)
+static ssize_t show_blend_filter(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int filter = ts->blend_filter;
+
+	t_dev_info(ts->dev, "%s: %d\n", __func__, filter);
+
+	return lxs_snprintf(buf, 0, "%d\n", filter);
+}
+
+/*
+ * blend filter
+ * 0 : off, 1 : weak, 2 : normal, 3 : strong
+ */
+static ssize_t store_blend_filter(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int value;
+
+	if (ts->state_core != TS_CORE_NORMAL)
+		return count;
+
+	if (sscanf(buf, "%d", &value) <= 0)
+		return count;
+
+	if (value < 0 || value > 3) {
+		t_dev_err(ts->dev, "%s: invalid %d\n", __func__, value);
+		return count;
+	}
+
+	t_dev_info(dev, "%s: value %d\n", __func__, value);
+
+	mutex_lock(&ts->lock);
+
+	ts->blend_filter = value;
+
+	lxs_hal_blend_filter(ts);
+
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static ssize_t show_stop_filter(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int filter = ts->stop_filter;
+
+	t_dev_info(ts->dev, "%s: %d\n", __func__, filter);
+
+	return lxs_snprintf(buf, 0, "%d\n", filter);
+}
+
+/*
+ * stop filter
+ * 0 : off, 1 : weak, 2 : normal, 3 : strong
+ */
+static ssize_t store_stop_filter(struct device *dev,
+				const char *buf, size_t count)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+	int value;
+
+	if (ts->state_core != TS_CORE_NORMAL)
+		return count;
+
+	if (sscanf(buf, "%d", &value) <= 0)
+		return count;
+
+	if (value < 0 || value > 3) {
+		t_dev_err(ts->dev, "%s: invalid %d\n", __func__, value);
+		return count;
+	}
+
+	t_dev_info(dev, "%s: value %d\n", __func__, value);
+
+	mutex_lock(&ts->lock);
+
+	ts->stop_filter = value;
+
+	lxs_hal_stop_filter(ts);
+
+	mutex_unlock(&ts->lock);
+
+	return count;
+}
+
+static ssize_t show_wet_mode(struct device *dev, char *buf)
+{
+	struct lxs_ts *ts = dev_get_drvdata(dev);
+
+	mutex_lock(&ts->lock);
+
+	lxs_hal_wet_mode(ts);
+
+	mutex_unlock(&ts->lock);
+
+	return lxs_snprintf(buf, 0, "%d\n", ts->wet_mode);
+}
+#endif	/* __LXS_SUPPORT_FILTER_CON */
 
 static ssize_t show_enable_sleep(struct device *dev, char *buf)
 {
@@ -1066,7 +1506,7 @@ static ssize_t store_enable_sleep(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	mutex_lock(&ts->lock);
@@ -1079,13 +1519,9 @@ static ssize_t store_enable_sleep(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(enable_sleep, show_enable_sleep, store_enable_sleep);
 
 #define _plat_data_snprintf(_buf, _size, args...)	\
 		lxs_snprintf(_buf, _size, " %-25s = %d\n", ##args)
-
-#define _plat_name_snprintf(_buf, _size, args...)	\
-		lxs_snprintf(_buf, _size, " %-25s = %s\n", ##args)
 
 static ssize_t show_plat_data(struct device *dev, char *buf)
 {
@@ -1126,23 +1562,12 @@ static ssize_t show_plat_data(struct device *dev, char *buf)
 		size += _plat_data_snprintf(buf, size,
 					" use_fw_skip_pid", plat_data->use_fw_skip_pid);
 
-	if (plat_data->fw_name)
-		size += _plat_name_snprintf(buf, size,
-					"firmware", plat_data->fw_name);
-
-	if (plat_data->avdd_name)
-		size += _plat_name_snprintf(buf, size,
-					"avdd_name", plat_data->avdd_name);
-
-	if (ts->plat_data->dvdd_name)
-		size += _plat_name_snprintf(buf, size,
-					"dvdd_name", plat_data->dvdd_name);
+	size += lxs_snprintf(buf, size, "firmware: %s\n", plat_data->fw_name);
 
 	mutex_unlock(&ts->lock);
 
 	return size;
 }
-static TS_ATTR(platform_data, show_plat_data, NULL);
 
 static ssize_t show_driver_data(struct device *dev, char *buf)
 {
@@ -1151,33 +1576,14 @@ static ssize_t show_driver_data(struct device *dev, char *buf)
 
 	mutex_lock(&ts->lock);
 
-	lxs_ts_options(ts);
-
 	size += lxs_snprintf(buf, size, "=== Driver Data ===\n");
 
-	size += lxs_snprintf(buf, size, "Version : %s\n", LXS_DRV_VERSION);
+	size += lxs_snprintf(buf, size,
+						"Version : %s\n", LXS_DRV_VERSION);
 
 	mutex_unlock(&ts->lock);
 
 	return size;
-}
-static TS_ATTR(driver_data, show_driver_data, NULL);
-
-static ssize_t show_fw_upgrade(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-
-	if (work_busy(&ts->upgrade_work.work)) {
-		t_dev_warn(dev, "%s: upgarde busy\n", __func__);
-		return 0;
-	}
-
-	ts->force_fwup |= TS_FORCE_FWUP_SYS_SHOW;
-	ts->test_fwpath[0] = '\0';
-
-	queue_delayed_work(ts->wq, &ts->upgrade_work, 0);
-
-	return 0;
 }
 
 static ssize_t store_fw_upgrade(struct device *dev,
@@ -1185,11 +1591,6 @@ static ssize_t store_fw_upgrade(struct device *dev,
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
 	int data = 0;
-
-	if (work_busy(&ts->upgrade_work.work)) {
-		t_dev_warn(dev, "%s: upgarde busy\n", __func__);
-		return count;
-	}
 
 	if (sscanf(buf, "%255s %X", ts->test_fwpath, &data) <= 0)
 		return count;
@@ -1203,169 +1604,18 @@ static ssize_t store_fw_upgrade(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(fw_upgrade, show_fw_upgrade, store_fw_upgrade);
 
-static ssize_t show_fwup_status(struct device *dev, char *buf)
+static ssize_t show_fw_upgrade(struct device *dev, char *buf)
 {
 	struct lxs_ts *ts = dev_get_drvdata(dev);
-	int fwup_status = lxs_hal_get_fwup_status(ts);
-	const char *str = lxs_fwup_status_str(fwup_status);
-	int size = 0;
 
-	if (fwup_status != FWUP_STATUS_BUSY)
-		t_dev_info(dev, "fwup_status: %d(%s)\n", fwup_status, str);
-
-	size += lxs_snprintf(buf, size, "%d\n", fwup_status);
-
-	return (ssize_t)size;
-}
-static TS_ATTR(fwup_status, show_fwup_status, NULL);
-
-#if defined(__LXS_SUPPORT_FW_DD)
-/*
- * Limited purpose only
- * Do not use in normal operation scenario.
- * Do not power off or change mode during these operations.
- */
-static ssize_t store_fw_dd(struct device *dev,
-				const char *buf, size_t count)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	struct lxs_ts_chip *chip = &ts->chip;
-	int dn_unit = (ts->fw_size>>3);
-	int dn_size;
-	u8 *p;
-
-	if (ts->shutdown_called)
-		return count;
-
-	if (chip->reset_is_on_going) {
-		t_dev_warn(dev, "%s: reset is ongoing\n", __func__);
-		return count;
-	}
-
-	if (work_busy(&ts->upgrade_work.work)) {
-		t_dev_warn(dev, "%s: upgarde busy\n", __func__);
-		return count;
-	}
-
-	mutex_lock(&ts->fw_dd_lock);
-
-	if ((ts->fw_dd_size + count) > ts->fw_size) {
-		t_dev_warn(ts->dev, "%s: size overflow(0x%X + 0x%X > 0x%X), realloc\n", __func__,
-			ts->fw_dd_size, (int)count, ts->fw_size);
-
-		lxs_ts_fw_dd_clr(ts);
-	}
-
-	p = krealloc(ts->fw_dd_data, ts->fw_dd_size + count, GFP_KERNEL);
-	if (!p) {
-		kfree(ts->fw_dd_data);
-		t_dev_err(ts->dev, "%s: fw_dd_data alloc failed, size 0x%X + 0x%X\n",
-			__func__, ts->fw_dd_size, (int)count);
-		goto out;
-	}
-	ts->fw_dd_data = p;
-
-	memcpy(&ts->fw_dd_data[ts->fw_dd_size], buf, count);
-	ts->fw_dd_size += count;
-
-	dn_size = ts->fw_dd_size;
-
-	if (!(dn_size & (dn_unit-1)) || (dn_size >= ts->fw_size)) {
-		t_dev_info(ts->dev, "%s: fw_dd_data received, size 0x%X\n",
-			__func__, ts->fw_dd_size);
-	}
-
-out:
-	mutex_unlock(&ts->fw_dd_lock);
-
-	return (ssize_t)count;
-}
-static TS_ATTR(fw_dd, NULL, store_fw_dd);
-
-static ssize_t store_fw_sv(struct device *dev,
-				const char *buf, size_t count)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	struct lxs_ts_chip *chip = &ts->chip;
-	int value;
-	int data;
-
-	if (sscanf(buf, "%X %X", &value, &data) <= 0)
-		return count;
-
-	if (ts->shutdown_called)
-		return count;
-
-	if (chip->reset_is_on_going) {
-		t_dev_warn(dev, "%s: reset is ongoing\n", __func__);
-		return count;
-	}
-
-	if (work_busy(&ts->upgrade_work.work)) {
-		t_dev_warn(dev, "%s: upgarde busy\n", __func__);
-		return count;
-	}
-
-	if (!value) {
-		if (ts->fw_dd_data) {
-			mutex_lock(&ts->fw_dd_lock);
-
-			t_dev_err(dev, "%s: free fw_dd_data\n", __func__);
-
-			lxs_ts_fw_dd_clr(ts);
-
-			mutex_unlock(&ts->fw_dd_lock);
-		}
-		return count;
-	}
-
-	if (value != 1)
-		return count;
-
-	mutex_lock(&ts->fw_dd_lock);
-
-	if (!ts->fw_dd_data || !ts->fw_dd_size) {
-		t_dev_err(dev, "%s: empty fw_dd_data\n", __func__);
-		goto out;
-	}
-
-	if (ts->fw_dd_size != ts->fw_size) {
-		t_dev_err(dev, "%s: invalid fw_dd_size, 0x%X != 0x%X\n",
-			__func__, ts->fw_dd_size, ts->fw_size);
-		goto out;
-	}
-
-	t_dev_info(ts->dev, "%s: begins\n", __func__);
-
-	ts->force_fwup |= TS_FORCE_FWUP_SYS_STORE;
-	ts->force_fwup |= (data == 0x5A5A) ? TS_FORCE_FWUP_SKIP_PID : 0;
-
-	ts->fw_sv_on = 1;
+	ts->force_fwup |= TS_FORCE_FWUP_SYS_SHOW;
+	ts->test_fwpath[0] = '\0';
 
 	queue_delayed_work(ts->wq, &ts->upgrade_work, 0);
 
-	while (work_busy(&ts->upgrade_work.work))
-		lxs_ts_delay(100);
-
-	t_dev_info(ts->dev, "%s: done\n", __func__);
-
-	/* Recovery for error case */
-	if (atomic_read(&chip->boot) == TC_IC_BOOT_FAIL) {
-		t_dev_info(ts->dev, "%s: run recovery\n", __func__);
-		queue_delayed_work(ts->wq, &ts->upgrade_work, msecs_to_jiffies(100));
-	}
-
-out:
-	lxs_ts_fw_dd_clr(ts);
-
-	mutex_unlock(&ts->fw_dd_lock);
-
-	return (ssize_t)count;
+	return 0;
 }
-static TS_ATTR(fw_sv, NULL, store_fw_sv);
-#endif	/* __LXS_SUPPORT_FW_DD */
 
 static ssize_t show_irq_flag(struct device *dev, char *buf)
 {
@@ -1373,7 +1623,6 @@ static ssize_t show_irq_flag(struct device *dev, char *buf)
 
 	return lxs_snprintf(buf, 0, "irq flag: 0x%X\n\n", (u32)ts->irqflags);
 }
-static TS_ATTR(irq_flag, show_irq_flag, NULL);
 
 static ssize_t show_irq_level(struct device *dev, char *buf)
 {
@@ -1381,7 +1630,6 @@ static ssize_t show_irq_level(struct device *dev, char *buf)
 
 	return lxs_snprintf(buf, 0, "%d\n", gpio_get_value(ts->plat_data->irq_pin));
 }
-static TS_ATTR(irq_level, show_irq_level, NULL);
 
 static ssize_t show_irq_state(struct device *dev, char *buf)
 {
@@ -1400,7 +1648,7 @@ static ssize_t store_irq_state(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -1419,7 +1667,7 @@ static ssize_t store_irq_state(struct device *dev,
 		 * Ex) write irq_state 10 : disable irq
 		 *                          only when the current touch state is 'resume'
 		 */
-		if (ts->state_mode == TS_MODE_SUSPEND) {
+		if(ts->state_mode == TS_MODE_SUSPEND) {
 			t_dev_info(ts->dev, "%s: state(%d) blocked in suspend\n",
 				__func__, value);
 			goto out;
@@ -1439,7 +1687,6 @@ out:
 
 	return (ssize_t)count;
 }
-static TS_ATTR(irq_state, show_irq_state, store_irq_state);
 
 static ssize_t show_rst_level(struct device *dev, char *buf)
 {
@@ -1448,12 +1695,8 @@ static ssize_t show_rst_level(struct device *dev, char *buf)
 	if (ts->plat_data->use_skip_reset)
 		return lxs_snprintf(buf, 0, "NA\n");
 
-	if (ts->fquirks->gpio_get_reset)
-		return lxs_snprintf(buf, 0, "%d\n", ts->fquirks->gpio_get_reset(ts));
-
 	return lxs_snprintf(buf, 0, "%d\n", gpio_get_value(ts->plat_data->reset_pin));
 }
-static TS_ATTR(rst_level, show_rst_level, NULL);
 
 static ssize_t show_module_info(struct device *dev, char *buf)
 {
@@ -1468,7 +1711,6 @@ static ssize_t show_module_info(struct device *dev, char *buf)
 
 	return (ssize_t)size;
 }
-static TS_ATTR(module_info, show_module_info, NULL);
 
 static ssize_t show_dbg_state(struct device *dev, char *buf)
 {
@@ -1477,7 +1719,6 @@ static ssize_t show_dbg_state(struct device *dev, char *buf)
 	return lxs_snprintf(buf, 0, "%d(TS_MODE_%s)\n", ts->state_mode,
 		(ts->state_mode) ? "SUSPEND" : "RESUME");
 }
-static TS_ATTR(dbg_state, show_dbg_state, NULL);
 
 static ssize_t show_dbg_driving(struct device *dev, char *buf)
 {
@@ -1494,7 +1735,7 @@ static ssize_t store_dbg_driving(struct device *dev,
 	struct lxs_ts_chip *chip = &ts->chip;
 	int value = 0;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -1511,7 +1752,6 @@ static ssize_t store_dbg_driving(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(dbg_driving, show_dbg_driving, store_dbg_driving);
 
 static ssize_t show_dbg_mask(struct device *dev, char *buf)
 {
@@ -1541,61 +1781,35 @@ static ssize_t store_dbg_mask(struct device *dev,
 				const char *buf, size_t count)
 {
 //	struct lxs_ts *ts = dev_get_drvdata(dev);
-	char *str = "";
-	int flag = 0;
-	int is_set, is_clr;
 	int type = 0;
 	u32 old_value, new_value = 0;
 
-	if (sscanf(buf, "%d %X %d", &type, &new_value, &flag) <= 0)
+	if (sscanf(buf, "%d %X", &type, &new_value) <= 0)
 		return count;
 
-	is_set = (flag == 1);
-	is_clr = (flag == 2);
-
-	if (is_set)
-		str = "(s)";
-	else if (is_clr)
-		str = "(c)";
-
 	switch (type) {
-	case 0:
+	case 0 :
 		old_value = t_dev_dbg_mask;
-		if (is_set)
-			t_dev_dbg_mask |= new_value;
-		else if (is_clr)
-			t_dev_dbg_mask &= ~new_value;
-		else
-			t_dev_dbg_mask = new_value;
-		t_dev_info(dev, "t_dev_dbg_mask changed%s : %08Xh -> %08xh\n",
-			str, old_value, t_dev_dbg_mask);
+		t_dev_dbg_mask = new_value;
+		t_dev_info(dev, "t_dev_dbg_mask changed : %08Xh -> %08xh\n",
+			old_value, new_value);
 		break;
-	case 1:
+	case 1 :
 		old_value = t_pr_dbg_mask;
-		if (is_set)
-			t_pr_dbg_mask |= new_value;
-		else if (is_clr)
-			t_pr_dbg_mask &= ~new_value;
-		else
-			t_pr_dbg_mask = new_value;
-		t_dev_info(dev, "t_pr_dbg_mask changed%s : %08Xh -> %08xh\n",
-			str, old_value, t_pr_dbg_mask);
+		t_pr_dbg_mask = new_value;
+		t_dev_info(dev, "t_pr_dbg_mask changed : %08Xh -> %08xh\n",
+			old_value, new_value);
 		break;
-	case 2:
+	case 2 :
 		/* TBD */
 		break;
-	case 3:
+	case 3 :
 		old_value = t_bus_dbg_mask;
-		if (is_set)
-			t_bus_dbg_mask |= new_value;
-		else if (is_clr)
-			t_bus_dbg_mask &= ~new_value;
-		else
-			t_bus_dbg_mask = new_value;
-		t_dev_info(dev, "t_bus_dbg_mask changed%s : %08Xh -> %08xh\n",
-			str, old_value, t_bus_dbg_mask);
+		t_bus_dbg_mask = new_value;
+		t_dev_info(dev, "t_bus_dbg_mask changed : %08Xh -> %08xh\n",
+			old_value, new_value);
 		break;
-	default:
+	default :
 		t_dev_info(dev, "Usage:\n");
 		t_dev_info(dev, " t_dev_dbg_mask : echo 0 {mask_value(hex)} > dbg_mask\n");
 		t_dev_info(dev, " t_pr_dbg_mask  : echo 1 {mask_value(hex)} > dbg_mask\n");
@@ -1605,7 +1819,6 @@ static ssize_t store_dbg_mask(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(dbg_mask, show_dbg_mask, store_dbg_mask);
 
 static ssize_t show_dbg_mode_async(struct device *dev, char *buf)
 {
@@ -1625,7 +1838,7 @@ static ssize_t store_dbg_mode_async(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	t_dev_info(dev, "%s: value %d\n", __func__, value);
@@ -1636,141 +1849,6 @@ static ssize_t store_dbg_mode_async(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(dbg_mode_async, show_dbg_mode_async, store_dbg_mode_async);
-
-static ssize_t show_dbg_resume_async(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-
-	t_dev_info(ts->dev, "resume_async %d\n", ts->resume_async);
-
-	return lxs_snprintf(buf, 0, "%d\n", ts->resume_async);
-}
-
-static ssize_t store_dbg_resume_async(struct device *dev,
-				const char *buf, size_t count)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	int value;
-
-	if (ts->state_core != TS_CORE_NORMAL)
-		return count;
-
-	if (kstrtoint(buf, 10, &value))
-		return count;
-
-	t_dev_info(dev, "%s: value %d\n", __func__, value);
-
-	mutex_lock(&ts->lock);
-	ts->resume_async = value;
-	mutex_unlock(&ts->lock);
-
-	return count;
-}
-static TS_ATTR(dbg_resume_async, show_dbg_resume_async, store_dbg_resume_async);
-
-static ssize_t show_dbg_opt(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	int size = 0;
-
-	size = lxs_hal_chipset_option_log(ts, buf);
-
-	return (ssize_t)size;
-}
-
-static ssize_t store_dbg_opt(struct device *dev,
-				const char *buf, size_t count)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	struct lxs_ts_chip *chip = &ts->chip;
-	struct lxs_ts_chip_opt *opt = &chip->opt;
-	int idx;
-	int val;
-	int sig = 0;
-
-	if (sscanf(buf, "%X %X %X", &idx, &val, &sig) <= 0)
-		return (ssize_t)count;
-
-	t_dev_info(dev, "%s: idx 0x%X, val 0x%X, sig 0x%X\n",
-		__func__, idx, val, sig);
-
-	switch (sig) {
-	case 0x5A5A:
-		break;
-	default:
-		return (ssize_t)count;
-	}
-
-	mutex_lock(&ts->lock);
-
-	switch (idx) {
-	case 1:
-		opt->f_dbg_report = val;
-		t_dev_info(dev, "%s: f_dbg_report %d\n",
-			__func__, opt->f_dbg_report);
-		break;
-	}
-
-	mutex_unlock(&ts->lock);
-
-	return (ssize_t)count;
-}
-static TS_ATTR(dbg_opt, show_dbg_opt, store_dbg_opt);
-
-#if defined(__LXS_SUPPORT_POWER_SUPPLY)
-static ssize_t show_dbg_psy_batt(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	union power_supply_propval val;
-	int capa_batt;
-
-	lxs_ts_psy_property(ts, ts->psy_batt, get, POWER_SUPPLY_PROP_CAPACITY, val);
-	capa_batt = val.intval;
-
-	return lxs_snprintf(buf, 0, "psy_battery: lv %d%%\n", capa_batt);
-}
-static TS_ATTR(dbg_psy_batt, show_dbg_psy_batt, NULL);
-
-static ssize_t show_dbg_psy_usb(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	union power_supply_propval val;
-	int online_usb;
-
-	lxs_ts_psy_property(ts, ts->psy_usb, get, POWER_SUPPLY_PROP_ONLINE, val);
-	online_usb = val.intval;
-
-	return lxs_snprintf(buf, 0, "psy_usb: on %d\n", online_usb);
-}
-static TS_ATTR(dbg_psy_usb, show_dbg_psy_usb, NULL);
-
-static ssize_t show_dbg_psy_otg(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	union power_supply_propval val;
-	int online_otg;
-
-	lxs_ts_psy_property(ts, ts->psy_otg, get, POWER_SUPPLY_PROP_ONLINE, val);
-	online_otg = val.intval;
-
-	return lxs_snprintf(buf, 0, "psy_otg: on %d\n", online_otg);
-}
-static TS_ATTR(dbg_psy_otg, show_dbg_psy_otg, NULL);
-
-static ssize_t show_dbg_psy_wireless(struct device *dev, char *buf)
-{
-	struct lxs_ts *ts = dev_get_drvdata(dev);
-	union power_supply_propval val;
-	int online_wireless;
-
-	lxs_ts_psy_property(ts, ts->psy_wireless, get, POWER_SUPPLY_PROP_ONLINE, val);
-	online_wireless = val.intval;
-
-	return lxs_snprintf(buf, 0, "psy_wireless: on %d\n", online_wireless);
-}
-static TS_ATTR(dbg_psy_wireless, show_dbg_psy_wireless, NULL);
-#endif	/* __LXS_SUPPORT_POWER_SUPPLY */
 
 #if defined(__LXS_SUPPORT_WATCHDOG)
 static ssize_t show_dbg_watchdog(struct device *dev, char *buf)
@@ -1793,7 +1871,7 @@ static ssize_t store_dbg_watchdog(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	if (!ts->watchdog_set)
@@ -1808,7 +1886,6 @@ static ssize_t store_dbg_watchdog(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(dbg_watchdog, show_dbg_watchdog, store_dbg_watchdog);
 
 static ssize_t store_dbg_watchdog_time(struct device *dev,
 				const char *buf, size_t count)
@@ -1819,7 +1896,7 @@ static ssize_t store_dbg_watchdog_time(struct device *dev,
 	if (ts->state_core != TS_CORE_NORMAL)
 		return count;
 
-	if (kstrtoint(buf, 10, &value))
+	if (sscanf(buf, "%d", &value) <= 0)
 		return count;
 
 	if (!ts->watchdog_set)
@@ -1831,114 +1908,124 @@ static ssize_t store_dbg_watchdog_time(struct device *dev,
 
 	return count;
 }
-static TS_ATTR(dbg_watchdog_time, NULL, store_dbg_watchdog_time);
-#endif	/* __LXS_SUPPORT_WATCHDOG */
+#endif
 
-#if defined(__LXS_SUPPORT_NEW_SYSFS_ATTR)
-static struct attribute *lxs_ts_attr_default_attrs[] = {
-#else
-static struct attribute *lxs_ts_attr_default[] = {
-#endif
-	__ts_attr_def(platform_data)
-	__ts_attr_def(driver_data)
-	__ts_attr_def(module_info)
-	__ts_attr_def(dbg_state)
-	__ts_attr_def(dbg_driving)
-	__ts_attr_def(dbg_mask)
-	__ts_attr_def(dbg_mode_async)
-	__ts_attr_def(dbg_resume_async)
-	__ts_attr_def(dbg_opt)
-#if defined(__LXS_SUPPORT_POWER_SUPPLY)
-	__ts_attr_def(dbg_psy_batt)
-	__ts_attr_def(dbg_psy_usb)
-	__ts_attr_def(dbg_psy_otg)
-	__ts_attr_def(dbg_psy_wireless)
-#endif
+static TS_ATTR(platform_data, show_plat_data, NULL);
+static TS_ATTR(driver_data, show_driver_data, NULL);
+static TS_ATTR(fw_upgrade, show_fw_upgrade, store_fw_upgrade);
+static TS_ATTR(irq_flag, show_irq_flag, NULL);
+static TS_ATTR(irq_level, show_irq_level, NULL);
+static TS_ATTR(irq_state, show_irq_state, store_irq_state);
+static TS_ATTR(rst_level, show_rst_level, NULL);
+static TS_ATTR(module_info, show_module_info, NULL);
+static TS_ATTR(dbg_state, show_dbg_state, NULL);
+static TS_ATTR(dbg_driving, show_dbg_driving, store_dbg_driving);
+static TS_ATTR(dbg_mask, show_dbg_mask, store_dbg_mask);
+static TS_ATTR(dbg_mode_async, show_dbg_mode_async, store_dbg_mode_async);
 #if defined(__LXS_SUPPORT_WATCHDOG)
-	__ts_attr_def(dbg_watchdog)
-	__ts_attr_def(dbg_watchdog_time)
+static TS_ATTR(dbg_watchdog, show_dbg_watchdog, store_dbg_watchdog);
+static TS_ATTR(dbg_watchdog_time, NULL, store_dbg_watchdog_time);
 #endif
-	/* */
-	__ts_attr_def(fw_upgrade)
-#if defined(__LXS_SUPPORT_FW_DD)
-	__ts_attr_def(fw_dd)
-	__ts_attr_def(fw_sv)
-#endif
-	__ts_attr_def(irq_flag)
-	__ts_attr_def(irq_level)
-	__ts_attr_def(irq_state)
-	__ts_attr_def(rst_level)
-	/* */
-	__ts_attr_def(reg_list)
-	__ts_attr_def(reg_ctrl)
-	__ts_attr_def(reset_ctrl)
-	__ts_attr_def(debug_tc_cmd)
-	__ts_attr_def(debug_power)
-	__ts_attr_def(fwup_status)
-	__ts_attr_def(version)
-	__ts_attr_def(version_no)
-	__ts_attr_def(lpwg_data)
-	__ts_attr_def(channel_info)
-	/* */
-	__ts_attr_def(glove_status)
-	__ts_attr_def(grab_status)
-	__ts_attr_def(usb_status)
-	__ts_attr_def(wirelss_status)
-	__ts_attr_def(ime_status)
-	__ts_attr_def(incoming_call)
-	__ts_attr_def(frame_rate)
-	/* */
-	__ts_attr_def(enable)
+
+static TS_ATTR(reg_list, show_reg_list, NULL);
+static TS_ATTR(reg_ctrl, show_reg_ctrl, store_reg_ctrl);
+static TS_ATTR(reset_ctrl, show_reset_ctrl, store_reset_ctrl);
+static TS_ATTR(debug_tc_cmd, show_debug_tc_cmd, store_debug_tc_cmd);
+static TS_ATTR(debug_power, show_debug_power, store_debug_power);
+static TS_ATTR(fwup_status, show_fwup_status, NULL);
+static TS_ATTR(version, show_version, NULL);
+static TS_ATTR(version_no, show_version_no, NULL);
+static TS_ATTR(lpwg_data, show_lpwg_data, NULL);
+static TS_ATTR(channel_info, show_channel_info, NULL);
+/* */
+static TS_ATTR(glove_status, show_glove_state, store_glove_state);
+static TS_ATTR(grab_status, show_grab_state, store_grab_state);
+static TS_ATTR(usb_status, show_usb_state, store_usb_state);
+static TS_ATTR(wirelss_status, show_wireless_state, store_wireless_state);
+static TS_ATTR(ime_status, show_ime_state, store_ime_state);
+static TS_ATTR(incoming_call, show_incoming_call, store_incoming_call);
+static TS_ATTR(frame_table, show_frame_table, NULL);
+static TS_ATTR(frame_rate_np, show_frame_rate_np, store_frame_rate_np);
+static TS_ATTR(frame_rate_lp, show_frame_rate_lp, store_frame_rate_lp);
+/* */
+static TS_ATTR(enable, show_enable, store_enable);
 #if defined(__LXS_SUPPORT_LPWG)
-	__ts_attr_def(enable_aod)
-	__ts_attr_def(enable_knock)
+static TS_ATTR(set_lowpower_mode, show_enable_lpm, store_enable_lpm);
+static TS_ATTR(enable_knock, show_enable_knock, store_enable_knock);
 #endif
-#if defined(__LXS_SUPPORT_PROX)
-	__ts_attr_def(enable_prox)
+static TS_ATTR(enable_sleep, show_enable_sleep, store_enable_sleep);
+static TS_ATTR(enable_prox, show_enable_prox, store_enable_prox);
+static TS_ATTR(after_probe, NULL, after_probe_start_store);
+static TS_ATTR(range_changer, show_range_changer, store_range_changer);
+static TS_ATTR(orientation_change, show_orientation_change, store_orientation_change);
+static TS_ATTR(rejection_mode, show_rejection_mode, store_rejection_mode);
+
+#if defined(__LXS_SUPPORT_FILTER_CON)
+static TS_ATTR(blend_filter, show_blend_filter, store_blend_filter);
+static TS_ATTR(stop_filter, show_stop_filter, store_stop_filter);
+static TS_ATTR(wet_mode, show_wet_mode, NULL);
 #endif
-	__ts_attr_def(enable_sleep)
+
+static struct attribute *lxs_ts_attr_default[] = {
+	&ts_attr_platform_data.attr,
+	&ts_attr_driver_data.attr,
+	&ts_attr_module_info.attr,
+	&ts_attr_dbg_state.attr,
+	&ts_attr_dbg_driving.attr,
+	&ts_attr_dbg_mask.attr,
+	&ts_attr_dbg_mode_async.attr,
+#if defined(__LXS_SUPPORT_WATCHDOG)
+	&ts_attr_dbg_watchdog.attr,
+	&ts_attr_dbg_watchdog_time.attr,
+#endif
+	/* */
+	&ts_attr_fw_upgrade.attr,
+	&ts_attr_irq_flag.attr,
+	&ts_attr_irq_level.attr,
+	&ts_attr_irq_state.attr,
+	&ts_attr_rst_level.attr,
+	/* */
+	&ts_attr_reg_list.attr,
+	&ts_attr_reg_ctrl.attr,
+	&ts_attr_reset_ctrl.attr,
+	&ts_attr_debug_tc_cmd.attr,
+	&ts_attr_debug_power.attr,
+	&ts_attr_fwup_status.attr,
+	&ts_attr_version.attr,
+	&ts_attr_version_no.attr,
+	&ts_attr_lpwg_data.attr,
+	&ts_attr_channel_info.attr,
+	/* */
+	&ts_attr_glove_status.attr,
+	&ts_attr_grab_status.attr,
+	&ts_attr_usb_status.attr,
+	&ts_attr_wirelss_status.attr,
+	&ts_attr_ime_status.attr,
+	&ts_attr_incoming_call.attr,
+	&ts_attr_frame_table.attr,
+	&ts_attr_frame_rate_lp.attr,
+	&ts_attr_frame_rate_np.attr,
+	/* */
+	&ts_attr_enable.attr,
+#if defined(__LXS_SUPPORT_LPWG)
+	&ts_attr_set_lowpower_mode.attr,
+	&ts_attr_enable_knock.attr,
+#endif
+	&ts_attr_enable_sleep.attr,
+	&ts_attr_enable_prox.attr,
+	&ts_attr_after_probe.attr,
+	&ts_attr_range_changer.attr,
+	&ts_attr_orientation_change.attr,
+	&ts_attr_rejection_mode.attr,
+	/* */
+#if defined(__LXS_SUPPORT_FILTER_CON)
+	&ts_attr_blend_filter.attr,
+	&ts_attr_stop_filter.attr,
+	&ts_attr_wet_mode.attr,
+#endif
 	/* */
 	NULL,
 };
-#if defined(__LXS_SUPPORT_NEW_SYSFS_ATTR)
-ATTRIBUTE_GROUPS(lxs_ts_attr_default);
-#endif
-
-static int lxs_ts_init_sysfs_link(struct lxs_ts *ts, struct kobject *kobj)
-{
-	int ret = 0;
-
-	if (ts->input) {
-		ret = sysfs_create_link(kobj, &ts->input->dev.kobj, "input");
-		if (ret < 0) {
-			t_dev_err(ts->dev, "failed to create input symbolic link, %d\n", ret);
-			goto out;
-		}
-	}
-
-	ret = sysfs_create_link(kobj, &ts->dev->kobj, "device");
-	if (ret < 0) {
-		t_dev_err(ts->dev, "failed to create device symbolic link, %d\n", ret);
-		goto out_dev;
-	}
-
-	return 0;
-
-out_dev:
-	if (ts->input)
-		sysfs_remove_link(kobj, "input");
-
-out:
-	return ret;
-}
-
-static void lxs_ts_free_sysfs_link(struct lxs_ts *ts, struct kobject *kobj)
-{
-	sysfs_remove_link(kobj, "device");
-
-	if (ts->input)
-		sysfs_remove_link(kobj, "input");
-}
 
 static ssize_t lxs_ts_attr_show(struct kobject *kobj,
 		struct attribute *attr, char *buf)
@@ -1978,25 +2065,31 @@ static const struct sysfs_ops lxs_ts_sysfs_ops = {
 	.store	= lxs_ts_attr_store,
 };
 
+static const struct attribute_group sysfs_group = {
+	.attrs = lxs_ts_attr_default,
+};
+
 static struct kobj_type lxs_ts_kobj_type = {
 	.sysfs_ops		= &lxs_ts_sysfs_ops,
-#if defined(__LXS_SUPPORT_NEW_SYSFS_ATTR)
-	.default_groups	= lxs_ts_attr_default_groups,
-#else
-	.default_attrs	= lxs_ts_attr_default,
-#endif
 };
 
 int lxs_ts_init_sysfs(struct lxs_ts *ts)
 {
+	struct device *idev = &ts->input->dev;
 	struct kobject *kobj = &ts->kobj;
 	int ret = 0;
 
 	ret = kobject_init_and_add(kobj, &lxs_ts_kobj_type,
-			ts->sysfs_parent, "%s", ts->sysfs_name);
+			idev->kobj.parent, "%s", ts->input_name);
 	if (ret < 0) {
 		t_dev_err(ts->dev, "failed to create sysfs entry\n");
 		goto out;
+	}
+
+	ret = sysfs_create_group(kobj, &sysfs_group);
+	if (ret < 0) {
+		t_dev_err(ts->dev, "%s: sysfs group creation failed (err = %d)\n", __func__, ret);
+		goto out_sysfs_grp;
 	}
 
 	if (ts->fquirks->sysfs_group != NULL) {
@@ -2007,17 +2100,9 @@ int lxs_ts_init_sysfs(struct lxs_ts *ts)
 		}
 	}
 
-	ret = lxs_ts_init_sysfs_link(ts, kobj);
-	if (ret < 0)
-		goto out_link;
-
-	t_dev_info(ts->dev, "lxs ts sysfs initialized\n");
+	t_dev_info(ts->dev, "sysfs initialized\n");
 
 	return 0;
-
-out_link:
-	if (ts->fquirks->sysfs_group != NULL)
-		sysfs_remove_group(kobj, ts->fquirks->sysfs_group);
 
 out_sysfs_grp:
 	kobject_del(&ts->kobj);
@@ -2029,9 +2114,15 @@ out:
 
 void lxs_ts_free_sysfs(struct lxs_ts *ts)
 {
+	struct device *idev = &ts->input->dev;
 	struct kobject *kobj = &ts->kobj;
 
-	lxs_ts_free_sysfs_link(ts, kobj);
+	if (kobj->parent != idev->kobj.parent) {
+		t_dev_warn(ts->dev, "Invalid kobject\n");
+		return;
+	}
+
+	sysfs_remove_group(kobj, &sysfs_group);
 
 	if (ts->fquirks->sysfs_group != NULL)
 		sysfs_remove_group(kobj, ts->fquirks->sysfs_group);

@@ -1,16 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0
+/*
+ * SPDX-License-Identifier: GPL-2.0
+ *
+ * lxs_ts_hal_prd.h
  *
  * LXS touch raw-data debugging
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
-/*
- * Copyright 2024 Sony Corporation.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
  * published by the Free Software Foundation.
  */
 
@@ -20,20 +16,21 @@
 #include "lxs_ts.h"
 
 #define __PRD_USE_BIG_ATTR
-#define __PRD_USE_BIG_ATTR_SD
 
 #define __PRD_SUPPORT_SD_TEST
 
+//#define __PRD_TEST_FILE_OFF
+
 #define __PRD_SUPPORT_SD_MIN_MAX
 
-#if IS_ENABLED(CONFIG_TOUCHSCREEN_LXS_LX82907A)
-#define __PRD_SUPPORT_SYS_DATA
-#endif
+#define SELF_TEST_PATH_DEFAULT	"/sdcard/lxs_ts_self_test.txt"
+#define SPEC_FILE_EXT_DEFAULT	"/sdcard/lxs_ts_spec.txt"
+#define SPEC_FILE_INT_DEFAULT	"lxs_ts_spec.txt"
 
 enum {
 	PRD_SPEC_LINE_SIZE = (128<<10),
 	/* */
-	PRD_LOG_POOL_SIZE = (6<<10),
+	PRD_LOG_POOL_SIZE = (8<<10),	//custom for SOMC SW82907
 	PRD_LOG_LINE_SIZE = (1<<10),
 	/* */
 	PRD_RAWBUF_SIZE	= (32<<10),
@@ -42,8 +39,15 @@ enum {
 };
 
 enum {
+	PRD_APP_INFO_SIZE	= 32,
+	/* */
 	PRD_M1_COL_SIZE	= 2,
 	PRD_SHORT_COL_SZ	= 4,
+};
+
+enum {
+	TIME_INFO_SKIP = 0,
+	TIME_INFO_WRITE,
 };
 
 enum {
@@ -52,9 +56,6 @@ enum {
 	PRD_CTRL_IDX_DELTA,
 	PRD_CTRL_IDX_LABEL,
 	PRD_CTRL_IDX_DEBUG,
-	PRD_CTRL_IDX_SYSR,
-	PRD_CTRL_IDX_SYSB,
-	PRD_CTRL_IDX_SYSD,
 	PRD_CTRL_IDX_P_POS_RAW,
 	PRD_CTRL_IDX_P_POS_BASE,
 	PRD_CTRL_IDX_P_POS_DELTA,
@@ -64,11 +65,12 @@ enum {
 	PRD_CTRL_IDX_P_BASE,
 	PRD_CTRL_IDX_P_DELTA,
 	PRD_CTRL_IDX_P_DEBUG,
+	PRD_CTRL_IDX_SYSR,
+	PRD_CTRL_IDX_SYSB,
+	PRD_CTRL_IDX_SYSD,
 	PRD_CTRL_IDX_P_POS_SYSR,
 	PRD_CTRL_IDX_P_SYSR,
 	PRD_CTRL_IDX_P_SYS_DEBUG,
-	/* */
-	PRD_CTRL_IDX_DEBUG2,
 	PRD_CTRL_IDX_MAX,
 };
 
@@ -87,6 +89,7 @@ enum {
 	PRD_CTRL_IDX_SD_U3_M1_JITTER,
 	PRD_CTRL_IDX_SD_U3_M2_RAW_SELF,
 	PRD_CTRL_IDX_SD_U3_JITTER_SELF,
+	PRD_CTRL_IDX_SD_U3_P_JITTER,
 	PRD_CTRL_IDX_SD_CALB,
 	PRD_CTRL_IDX_SD_SYNC,
 	PRD_CTRL_IDX_SD_IRQ,
@@ -108,6 +111,7 @@ enum {
 	PRD_CTRL_IDX_LPWG_SD_U0_M1_JITTER,
 	PRD_CTRL_IDX_LPWG_SD_U0_M2_RAW_SELF,
 	PRD_CTRL_IDX_LPWG_SD_U0_JITTER_SELF,
+	PRD_CTRL_IDX_LPWG_SD_U0_P_JITTER,
 	PRD_CTRL_IDX_LPWG_SD_MAX,
 };
 
@@ -146,7 +150,7 @@ enum {
 			.delay = _delay, .is_sd = 1, .is_os = 0,	\
 		}
 
-#define LPWG_SD_CTRL_OS_INIT(_id, _name, _cmd, _data_fmt, _flag, _row, _col, _offset, _get_func, _mod_func, _prt_func, _cmp_func, _delay)	\
+#define LPWG_SD_OS_INIT(_id, _name, _cmd, _data_fmt, _flag, _row, _col, _offset, _get_func, _mod_func, _prt_func, _cmp_func, _delay)	\
 		{	\
 			.id = _id, .name = _name, .cmd = _cmd,	\
 			.data_fmt = _data_fmt, .flag = _flag,\
@@ -180,9 +184,6 @@ enum {
 	PRD_RAW_FLAG_FW_NO_STS	= BIT(17),
 	PRD_RAW_FLAG_RESP_LSB	= BIT(18),
 	/* */
-	PRD_RAW_FLAG_DIM_SCONV	= BIT(20),
-	PRD_RAW_FLAG_DIM_NCPY	= BIT(21),
-	/* */
 	PRD_RAW_FLAG_IGN_ROW_T	= BIT(24),	//Ignore ROW Top line
 	PRD_RAW_FLAG_IGN_ROW_B	= BIT(25),	//Ignore ROW Bottom line
 	PRD_RAW_FLAG_IGN_COL_R	= BIT(26),	//Ignore COL Right line
@@ -212,7 +213,7 @@ enum {
 	PRD_DATA_FMT_SELF_TX_FIRST	= BIT(16),	// for print_rxtx
 	PRD_DATA_FMT_SELF_MISALIGN	= BIT(17),	// for print_raw
 	PRD_DATA_FMT_SELF_REV_C		= BIT(18),
-	PRD_DATA_FMT_SELF_REV_R		= BIT(19),
+	PRD_DATA_FMT_SELF_REV_R	 	= BIT(19),
 	/* */
 	PRD_DATA_FMT_SELF_REV_DIR	= (PRD_DATA_FMT_SELF_REV_C|PRD_DATA_FMT_SELF_REV_R),
 	PRD_DATA_FMT_SELF_REV_CHK	= (PRD_DATA_FMT_SELF_MISALIGN|PRD_DATA_FMT_SELF_REV_DIR),
@@ -285,8 +286,6 @@ static const struct lxs_prd_dim_ctl prd_dim_table[] = {
 	PRD_DIM_TBL(-1, 0, 0, 0, 0),	/* End mark */
 };
 
-struct lxs_prd_data;
-
 /*
  * invalid node zone : 'col_s <= col <= col_e' & 'row_s <= row <= row_e'
  */
@@ -307,6 +306,7 @@ struct lxs_prd_raw_ctrl {
 	char *name;
 	int cmd;
 	u32 data_fmt;
+	u32 data_dim;	//TBD
 	u32 flag;
 	int row_size;
 	int col_size;
@@ -314,9 +314,6 @@ struct lxs_prd_raw_ctrl {
 	int col_act;	//actual col for print
 	int data_size;
 	u32 offset;
-	/* */
-	u32 reg_cmd;
-	u32 reg_sts;
 	/* */
 	char *raw_buf;
 	char *raw_tmp;
@@ -338,6 +335,7 @@ struct lxs_prd_sd_ctrl {
 	char *name;
 	int cmd;
 	u32 data_fmt;
+	u32 data_dim;	//TBD
 	u32 flag;
 	int row_size;
 	int col_size;
@@ -345,9 +343,6 @@ struct lxs_prd_sd_ctrl {
 	int col_act;	//actual col for print
 	int data_size;
 	u32 offset;
-	/* */
-	u32 reg_cmd;
-	u32 reg_sts;
 	/* */
 	char *raw_buf;
 	char *raw_tmp;
@@ -378,10 +373,6 @@ struct lxs_prd_sd_ctrl {
 	int max;
 };
 
-struct lxs_prd_fquirks {
-	void (*pin_reset)(struct lxs_prd_data *prd, int delay);
-};
-
 struct lxs_prd_data {
 	void *ts;
 	struct device *dev;
@@ -389,6 +380,8 @@ struct lxs_prd_data {
 	/* */
 	int chip_type;
 	int panel_type;
+	int file_wr_off;
+	int file_rd_off;
 	int dbg_mask;
 	int test_type;
 	/* */
@@ -397,8 +390,6 @@ struct lxs_prd_data {
 	int col;
 	int row_adj;
 	int col_adj;
-	int row_def;
-	int col_def;
 	int ch;
 	int raw_base;
 	int sys_base;
@@ -436,7 +427,7 @@ struct lxs_prd_data {
 	struct lxs_prd_dim_reg raw_dim_reg;
 	struct lxs_prd_dim_reg sys_dim_reg;
 	/* */
-//	char spec_line[PRD_SPEC_LINE_SIZE + PRD_BUF_DUMMY];
+	char spec_line[PRD_SPEC_LINE_SIZE + PRD_BUF_DUMMY];
 	char log_line[PRD_LOG_LINE_SIZE + PRD_BUF_DUMMY];
 	char log_pool[PRD_LOG_POOL_SIZE + PRD_BUF_DUMMY];
 	char log_bin[PRD_LOG_POOL_SIZE + PRD_BUF_DUMMY];
@@ -446,7 +437,7 @@ struct lxs_prd_data {
 	char raw_c[128<<1];
 	char raw_r[128<<1];
 	/* */
-#if defined(__DBG_PT_CMP)
+#if 0
 	u16 cmp_lower_array[PRD_RAWBUF_SIZE + PRD_BUF_DUMMY];
 	u16 cmp_upper_array[PRD_RAWBUF_SIZE + PRD_BUF_DUMMY];
 	char cmp_lower_str[64];
@@ -469,8 +460,11 @@ struct lxs_prd_data {
 	int sysfs_flag;
 	/* */
 	int sysfs_done;
-	/* */
-	struct lxs_prd_fquirks fquirks;
+};
+
+enum {
+	CMD_TEST_EXIT = 0,
+	CMD_TEST_ENTER,
 };
 
 /* AIT Algorithm Engine HandShake CMD */
@@ -516,7 +510,7 @@ enum {
 /* AIT Algorithm Engine HandShake Status */
 enum {
 	RS_READY	= 0xA0,
-	RS_NONE		= 0x05,
+	RS_NONE	= 0x05,
 	RS_LOG		= 0x77,
 	RS_IMAGE	= 0xAA
 };
@@ -536,11 +530,7 @@ enum {
 	REPORT_BASE,
 	REPORT_DELTA,
 	REPORT_LABEL,
-	REPORT_DEBUG,
-	/* */
-	REPORT_SYSR,
-	REPORT_SYSB,
-	REPORT_SYSD,
+	REPORT_DEBUG_BUG,
 	/* */
 	REPORT_P_POS_RAW,
 	REPORT_P_POS_BASE,
@@ -552,6 +542,9 @@ enum {
 	REPORT_P_BASE,
 	REPORT_P_DELTA,
 	/* */
+	REPORT_SYSR,
+	REPORT_SYSB,
+	REPORT_SYSD,
 	REPORT_P_POS_SYSR,
 	REPORT_P_SYSR,
 	REPORT_P_SYS_DEBUG,
@@ -559,17 +552,13 @@ enum {
 	REPORT_MAX,
 };
 
-static const char * const prd_app_mode_str[] = {
+static const char *prd_app_mode_str[] = {
 	[REPORT_OFF]			= "OFF",
 	[REPORT_RAW]			= "RAW",
 	[REPORT_BASE]			= "BASE",
 	[REPORT_LABEL]			= "LABEL",
 	[REPORT_DELTA]			= "DELTA",
-	[REPORT_DEBUG]			= "DEBUG",
-	/* */
-	[REPORT_SYSR]			= "SYSR",
-	[REPORT_SYSB]			= "SYSB",
-	[REPORT_SYSD]			= "SYSD",
+	[REPORT_DEBUG_BUG]		= "DEBUG_BUF",
 	/* */
 	[REPORT_P_POS_RAW]		= "P_POS_RAW",
 	[REPORT_P_POS_BASE]		= "P_POS_BASE",
@@ -581,6 +570,9 @@ static const char * const prd_app_mode_str[] = {
 	[REPORT_P_BASE]			= "BASE_P",
 	[REPORT_P_DELTA]		= "DELTA_P",
 	/* */
+	[REPORT_SYSR]			= "SYSR",
+	[REPORT_SYSB]			= "SYSB",
+	[REPORT_SYSD]			= "SYSD",
 	[REPORT_P_POS_SYSR]		= "SYSR_P_POS",
 	[REPORT_P_SYSR]			= "SYSR_P",
 	[REPORT_P_SYS_DEBUG]	= "SYS_P_DEBUG",
@@ -592,11 +584,7 @@ static const int prd_app_mode_ctrl_id[] = {
 	[REPORT_BASE]			= PRD_CTRL_IDX_BASE,
 	[REPORT_DELTA]			= PRD_CTRL_IDX_DELTA,
 	[REPORT_LABEL]			= PRD_CTRL_IDX_LABEL,
-	[REPORT_DEBUG]			= PRD_CTRL_IDX_DEBUG,
-	/* */
-	[REPORT_SYSR]			= PRD_CTRL_IDX_SYSR,
-	[REPORT_SYSB]			= PRD_CTRL_IDX_SYSB,
-	[REPORT_SYSD]			= PRD_CTRL_IDX_SYSD,
+	[REPORT_DEBUG_BUG]		= PRD_CTRL_IDX_DEBUG,
 	/* */
 	[REPORT_P_POS_RAW]		= PRD_CTRL_IDX_P_POS_RAW,
 	[REPORT_P_POS_BASE]		= PRD_CTRL_IDX_P_POS_BASE,
@@ -608,6 +596,9 @@ static const int prd_app_mode_ctrl_id[] = {
 	[REPORT_P_BASE]			= PRD_CTRL_IDX_P_BASE,
 	[REPORT_P_DELTA]		= PRD_CTRL_IDX_P_DELTA,
 	/* */
+	[REPORT_SYSR]			= PRD_CTRL_IDX_SYSR,
+	[REPORT_SYSB]			= PRD_CTRL_IDX_SYSB,
+	[REPORT_SYSD]			= PRD_CTRL_IDX_SYSD,
 	[REPORT_P_POS_SYSR]		= PRD_CTRL_IDX_P_POS_SYSR,
 	[REPORT_P_SYSR]			= PRD_CTRL_IDX_P_SYSR,
 	[REPORT_P_SYS_DEBUG]	= PRD_CTRL_IDX_P_SYS_DEBUG,
@@ -638,8 +629,8 @@ enum {
 #define RAWDATA_MAX_DIGIT4		(9999)
 #define RAWDATA_MIN_DIGIT4		(-999)
 
-#define LXS_PRD_TAG			"prd: "
-#define LXS_PRD_TAG_ERR		"prd(E): "
+#define LXS_PRD_TAG 		"prd: "
+#define LXS_PRD_TAG_ERR 	"prd(E): "
 #define LXS_PRD_TAG_WARN	"prd(W): "
 #define LXS_PRD_TAG_DBG		"prd(D): "
 
@@ -665,20 +656,19 @@ enum {
 		t_prd_dbg(DBG_TRACE, _prd, fmt, ##args)
 
 #define lxs_prd_buf_snprintf(_prt_buf, _prt_size, _fmt, _args...) \
-		__lxs_snprintf(_prt_buf, PRD_LOG_POOL_SIZE, _prt_size, _fmt, ##_args)
+		__lxs_snprintf(_prt_buf, PRD_LOG_POOL_SIZE, _prt_size, _fmt, ##_args);
 
 #define lxs_prd_log_buf_snprintf(_log_buf, _prt_size, _fmt, _args...) \
-		__lxs_snprintf(_log_buf, PRD_LOG_LINE_SIZE, _prt_size, _fmt, ##_args)
+		__lxs_snprintf(_log_buf, PRD_LOG_LINE_SIZE, _prt_size, _fmt, ##_args);
 
 #define lxs_prd_log_info(_prd, _buf, _size)	\
 		do {	\
 			if (t_prd_dbg_flag & PRD_DBG_FLAG_RAW_LOG_ON) {	\
-				if (_size)	\
-					t_prd_info(_prd, "%s\n", _buf);	\
+				if (_size)	t_prd_info(_prd, "%s\n", _buf);	\
 			}	\
 		} while (0)
 
-#if defined(__SOMC_CUSTOM)
+#if 1	/* SOMC */
 #define SD_RESULT_PASS	1
 #define SD_RESULT_FAIL	0
 
@@ -723,21 +713,25 @@ static ssize_t prd_show_app_##_name(struct device *dev,	char *buf)	\
 {	\
 	return prd_show_app_common(dev, buf, REPORT_##_idx);	\
 }	\
-static TS_ATTR_PRD(prd_app_##_name, prd_show_app_##_name, NULL)
+static TS_ATTR(prd_app_##_name, prd_show_app_##_name, NULL)
 
 /*
  * Standard - PAGE_SIZE(4KB)
  */
-#define TS_ATTR_PRD_STD(_name, _idx)	\
+#define TS_ATTR_PRD_STD(_name, _idx, _chk)	\
 static ssize_t prd_show_##_name(struct device *dev, char *buf)	\
 {	\
-	return min_t(ssize_t, prd_show_common(dev, buf, PRD_CTRL_IDX_##_idx), (ssize_t)PAGE_SIZE);	\
+	return min(prd_show_common(dev, buf, PRD_CTRL_IDX_##_idx), (ssize_t)PAGE_SIZE);	\
 }	\
-static TS_ATTR_PRD(_name, prd_show_##_name, NULL)
+static TS_ATTR(_name, prd_show_##_name, NULL)
 
 #define PRD_BIN_ATTR_SIZE	(PRD_LOG_POOL_SIZE + PRD_BUF_DUMMY)
 
-#define TS_ATTR_PRD_BIN(_name, _idx)	\
+#define TS_ATTR_PRD_BIN(_name, _idx, _chk)	\
+static ssize_t prd_show_##_name(struct device *dev, char *buf)	\
+{	\
+	return prd_show_common(dev, buf, PRD_CTRL_IDX_##_idx);	\
+}	\
 static ssize_t prd_show_bin_##_name(struct file *filp, struct kobject *kobj,	\
 			struct bin_attribute *bin_attr, \
 			char *buf, loff_t off, size_t count)	\
@@ -748,7 +742,7 @@ static ssize_t prd_show_bin_##_name(struct file *filp, struct kobject *kobj,	\
 	int prd_buf_size = bin_attr->size;	\
 	if (off == 0) { \
 		memset(log_bin, 0, prd_buf_size);	\
-		prd_show_common(ts->dev, log_bin, PRD_CTRL_IDX_##_idx);	\
+		prd_show_##_name(ts->dev, log_bin); \
 	}	\
 	if ((off + count) > prd_buf_size) { \
 		memset(buf, 0, count);	\
@@ -764,30 +758,6 @@ static TS_BIN_ATTR(_name, prd_show_bin_##_name, NULL, PRD_BIN_ATTR_SIZE)
 #else
 #define TS_ATTR_PRD_RAW		TS_ATTR_PRD_STD
 #endif
-
-#if defined(__PRD_SUPPORT_SYS_DATA)
-#define TS_ATTR_PRD_SYS(_name, _idx)			TS_ATTR_PRD_RAW(_name, _idx)
-#define TS_ATTR_PRD_APP_SYS(_name, _idx)		TS_ATTR_PRD_APP(_name, _idx)
-#define __ts_attr_sys(_name)					__ts_attr_def(_name)
-#define __ts_bin_attr_sys(_name)				__ts_bin_attr_def(_name)
-#else	/* !__PRD_SUPPORT_SYS_DATA */
-#define TS_ATTR_PRD_SYS(_name, _idx)
-#define TS_ATTR_PRD_APP_SYS(_name, _idx)
-#define __ts_attr_sys(_name)
-#define __ts_bin_attr_sys(_name)
-#endif	/* __PRD_SUPPORT_SYS_DATA */
-
-#if defined(__PRD_USE_BIG_ATTR)
-#define __ts_attr_raw_def(_name)
-#define __ts_attr_raw_sys(_name)
-#define __ts_bin_attr_raw_def(_name)			__ts_bin_attr_def(_name)
-#define __ts_bin_attr_raw_sys(_name)			__ts_bin_attr_sys(_name)
-#else	/* !__PRD_USE_BIG_ATTR */
-#define __ts_attr_raw_def(_name)				__ts_attr_def(_name)
-#define __ts_attr_raw_sys(_name)				__ts_attr_sys(_name)
-#define __ts_bin_attr_raw_def(_name)
-#define __ts_bin_attr_raw_sys(_name)
-#endif	/* __PRD_USE_BIG_ATTR */
 
 /*---------------------------------------------------------------------------*/
 
@@ -821,7 +791,7 @@ enum {
 #define TS_ATTR_PRD_SD(_np, _name, _idx, _is_raw)	\
 static ssize_t prd_show_##_name(struct device *dev, char *buf)	\
 {	\
-	return min_t(ssize_t, prd_show_sd_sub_common(dev, buf, NULL, (_is_raw) ? PAGE_SIZE : 0, PRD_SD_SUB_IDX_##_idx, _np), (ssize_t)PAGE_SIZE);	\
+	return prd_show_sd_sub_common(dev, buf, NULL, (_is_raw) ? PAGE_SIZE : 0, PRD_SD_SUB_IDX_##_idx, _np);	\
 }	\
 static TS_ATTR_PRD(_name, prd_show_##_name, NULL)
 
@@ -836,40 +806,6 @@ static TS_ATTR_PRD(_name, prd_show_##_name, NULL)
 #define TS_ATTR_PRD_SD_LP_CMP(_name, _idx, _is_raw)	TS_ATTR_PRD_SD(BIT(1), _name, _idx, _is_raw)
 #define TS_ATTR_PRD_SD_LP(_name, _idx, _is_raw)	TS_ATTR_PRD_SD(0, _name, _idx, _is_raw)
 
-#if defined(__PRD_USE_BIG_ATTR_SD)
-#define TS_ATTR_PRD_SD_BIN(_np, _name, _idx)	\
-static ssize_t prd_show_bin_##_name(struct file *filp, struct kobject *kobj,	\
-			struct bin_attribute *bin_attr, \
-			char *buf, loff_t off, size_t count)	\
-{	\
-	struct lxs_ts *ts = container_of(kobj, struct lxs_ts, kobj);	\
-	struct lxs_prd_data *prd = (struct lxs_prd_data *)ts->prd;	\
-	char *log_bin = prd->log_bin;	\
-	int prd_buf_size = bin_attr->size;	\
-	if (off == 0) { \
-		memset(log_bin, 0, prd_buf_size);	\
-		prd_show_sd_sub_common(ts->dev, log_bin, NULL, prd_buf_size, PRD_SD_SUB_IDX_##_idx, _np);	\
-	}	\
-	if ((off + count) > prd_buf_size) { \
-		memset(buf, 0, count);	\
-	} else {	\
-		memcpy(buf, &log_bin[off], count);	\
-	}	\
-	return (ssize_t)count;	\
-}	\
-static TS_BIN_ATTR(_name, prd_show_bin_##_name, NULL, PRD_BIN_ATTR_SIZE)
-
-#define TS_ATTR_PRD_SD_NP_RAW(_name, _idx)	TS_ATTR_PRD_SD_BIN(1, _name, _idx)
-#define TS_ATTR_PRD_SD_LP_RAW(_name, _idx)	TS_ATTR_PRD_SD_BIN(0, _name, _idx)
-
-#define __ts_attr_raw_def_sd(_name)
-#define __ts_bin_attr_raw_def_sd(_name)		__ts_bin_attr_def(_name)
-#else	/* !__PRD_USE_BIG_ATTR_SD */
-#define TS_ATTR_PRD_SD_NP_RAW(_name, _idx)	TS_ATTR_PRD_SD_NP(_name, _idx, 1)
-#define TS_ATTR_PRD_SD_LP_RAW(_name, _idx)	TS_ATTR_PRD_SD_LP(_name, _idx, 1)
-
-#define __ts_attr_raw_def_sd(_name)			__ts_attr_def(_name)
-#define __ts_bin_attr_raw_def_sd(_name)
-#endif	/* __PRD_USE_BIG_ATTR_SD */
-
 #endif /* __LXS_TS_HAL_PRD_H */
+
+

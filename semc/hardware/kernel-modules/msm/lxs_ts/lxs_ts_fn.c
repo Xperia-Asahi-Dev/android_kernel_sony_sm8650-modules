@@ -1,12 +1,8 @@
 /*
- * Copyright 2024 Sony Corporation.
+ * SPDX-License-Identifier: GPL-2.0
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
-// SPDX-License-Identifier: GPL-2.0
-/*
+ * lxs_ts_fn.c
+ *
  * LXS touch sub-functions
  *
  * This program is free software; you can redistribute it and/or modify
@@ -73,11 +69,7 @@ static int lxs_ts_gpio_init_reset(struct lxs_ts *ts)
 	if (ts->plat_data->use_skip_reset)
 		return 0;
 
-#if defined(__SOMC_CUSTOM_GPIO_SHARE)
 	return 0;
-#else
-	return __gpio_init(ts, ts->plat_data->reset_pin, GPIOF_OUT_INIT_LOW, LXS_TS_GPIO_RST, "gpio_reset");
-#endif
 }
 
 static void lxs_ts_gpio_free_reset(struct lxs_ts *ts)
@@ -89,12 +81,6 @@ static void lxs_ts_gpio_free_reset(struct lxs_ts *ts)
 
 	if (ts->plat_data->use_skip_reset)
 		return;
-
-#if defined(__SOMC_CUSTOM_GPIO_SHARE)
-	/* Noop */
-#else
-	__gpio_free(ts, ts->plat_data->reset_pin, "gpio_reset");
-#endif
 }
 
 void lxs_ts_gpio_set_reset(struct lxs_ts *ts, bool val)
@@ -155,7 +141,6 @@ void lxs_ts_free_gpios(struct lxs_ts *ts)
 int lxs_ts_irq_level_check(struct lxs_ts *ts)
 {
 	int pin = ts->plat_data->irq_pin;
-	int cnt = (ts->irq_chk_cnt) ? ts->irq_chk_cnt : 8;
 	int i;
 
 	if (!ts->plat_data->use_irq_verify)
@@ -164,7 +149,8 @@ int lxs_ts_irq_level_check(struct lxs_ts *ts)
 	if (!gpio_is_valid(pin))
 		return 0;
 
-	for (i = 0; i < cnt; i++) {
+	//Check period : 8 msec(about 120Hz)
+	for (i = 0; i < 8; i++) {
 		if (gpio_get_value(pin))
 			return 0;
 
@@ -193,8 +179,9 @@ int lxs_ts_set_pinctrl(struct lxs_ts *ts, bool on)
 		return 0;
 
 	state = (on) ? ts->pinctrl_state_on : ts->pinctrl_state_off;
-	if (IS_ERR_OR_NULL(state))
+	if (IS_ERR_OR_NULL(state)) {
 		return 0;
+	}
 
 	ret = pinctrl_select_state(pinctrl, state);
 	if (ret) {
@@ -267,98 +254,10 @@ static inline void lxs_ts_free_pinctrl(struct lxs_ts *ts)
 
 #define __LAYER_POWER__
 
-#if defined(__SOMC_CUSTOM_POWER_CTRL)
 static void lxs_ts_power_reg(struct lxs_ts *ts, int on)
 {
-	ts->power_working = 1;
+	return;
 }
-#else	/* !__SOMC_CUSTOM_POWER_CTRL */
-static void lxs_ts_power_reg(struct lxs_ts *ts, int on)
-{
-	static bool boot_on = true;
-	int ret = 0;
-
-	if (ts->plat_data->avdd_name && IS_ERR_OR_NULL(ts->avdd))
-		ts->avdd = devm_regulator_get(ts->dev, ts->plat_data->avdd_name);
-
-	if (ts->plat_data->dvdd_name && IS_ERR_OR_NULL(ts->dvdd))
-		ts->dvdd = devm_regulator_get(ts->dev, ts->plat_data->dvdd_name);
-
-	if (IS_ERR_OR_NULL(ts->avdd) || IS_ERR_OR_NULL(ts->dvdd)) {
-		if (boot_on) {
-			t_dev_info(ts->dev, "power_reg: not found\n");
-			ts->power_enabled = TS_POWER_ON;
-		}
-		goto out;
-	}
-
-	ts->power_working = 1;
-
-	if (ts->power_enabled == on) {
-		t_dev_info(ts->dev, "power_reg: power_enabled %d\n", ts->power_enabled);
-		return;
-	}
-
-	if (on) {
-		/* VDD(3.3V) first, VIO(1.8V) later */
-		if (!regulator_is_enabled(ts->avdd) || boot_on) {
-			ret = regulator_enable(ts->avdd);
-			if (ret) {
-				t_dev_err(ts->dev, "power_reg: failed to enable avdd: %d\n", ret);
-				goto out;
-			}
-		} else
-			t_dev_warn(ts->dev, "power_reg: avdd is already enabled\n");
-
-		lxs_ts_delay(5);
-
-		if (!regulator_is_enabled(ts->dvdd) || boot_on) {
-			ret = regulator_enable(ts->dvdd);
-			if (ret) {
-				t_dev_err(ts->dev, "power_reg: failed to enable dvdd: %d\n", ret);
-				goto out;
-			}
-		} else
-			t_dev_warn(ts->dev, "power_reg: dvdd is already enabled\n");
-	} else {
-		/* VIO(1.8V) first, VDD(3.3V) later */
-		if (regulator_is_enabled(ts->dvdd)) {
-			ret = regulator_disable(ts->dvdd);
-			if (ret) {
-				t_dev_err(ts->dev, "power_reg: failed to disable dvdd: %d\n", ret);
-				goto out;
-			}
-		} else
-			t_dev_warn(ts->dev, "power_reg: dvdd is already disabled\n");
-
-		lxs_ts_delay(20);
-
-		if (regulator_is_enabled(ts->avdd)) {
-			ret = regulator_disable(ts->avdd);
-			if (ret) {
-				t_dev_err(ts->dev, "power_reg: failed to disable avdd: %d\n", ret);
-				ret = regulator_enable(ts->dvdd);
-				goto out;
-			}
-		} else
-			t_dev_warn(ts->dev, "power_reg: avdd is already disabled\n");
-
-		atomic_set(&ts->chip.init, TC_IC_INIT_NEED);
-	}
-
-	ts->power_enabled = on;
-
-	t_dev_info(ts->dev, "power_reg: %s: avdd(%s):%s, dvdd(%s):%s\n",
-		(on) ? "on" : "off",
-		ts->plat_data->avdd_name,
-		regulator_is_enabled(ts->avdd) ? "on" : "off",
-		ts->plat_data->dvdd_name,
-		regulator_is_enabled(ts->dvdd) ? "on" : "off");
-
-out:
-	boot_on = false;
-}
-#endif	/* __SOMC_CUSTOM_POWER_CTRL */
 
 int lxs_ts_power_ctrl(struct lxs_ts *ts, int ctrl)
 {
@@ -393,13 +292,11 @@ int lxs_ts_power_reset(struct lxs_ts *ts, int ctrl)
 
 		lxs_ts_delay(5);
 
-		if (!ts->plat_data->use_pwr_connect)
-			lxs_ts_power_ctrl(ts, ctrl);
+		lxs_ts_power_ctrl(ts, ctrl);
 		break;
 
 	case TS_POWER_ON:
-		if (!ts->plat_data->use_pwr_connect)
-			lxs_ts_power_ctrl(ts, ctrl);
+		lxs_ts_power_ctrl(ts, ctrl);
 
 		lxs_ts_delay(5);
 
@@ -413,83 +310,6 @@ int lxs_ts_power_reset(struct lxs_ts *ts, int ctrl)
 	}
 
 	return 0;
-}
-
-#if defined(__LXS_QUIRK_SLEEP)
-static void lxs_ts_power_reg_quirk_sleep(struct lxs_ts *ts)
-{
-#if !defined(__SOMC_CUSTOM_POWER_CTRL)
-	int ret;
-
-	if (!ts->power_working)
-		return;
-
-	if (ts->power_enabled == TS_POWER_OFF)
-		return;
-
-	if (IS_ERR_OR_NULL(ts->avdd))
-		return;
-
-	if (regulator_is_enabled(ts->avdd)) {
-		ret = regulator_disable(ts->avdd);
-		if (ret)
-			t_dev_err(ts->dev, "power_reg(quirk): failed to disable avdd: %d\n", ret);
-	}
-
-	ts->power_enabled = TS_POWER_OFF;
-
-	t_dev_info(ts->dev, "power_reg(quirk): off: avdd(%s):%s, dvdd(%s):%s\n",
-		ts->plat_data->avdd_name,
-		regulator_is_enabled(ts->avdd) ? "on" : "off",
-		ts->plat_data->dvdd_name,
-		regulator_is_enabled(ts->dvdd) ? "on" : "off");
-#endif
-}
-
-void lxs_ts_power_quirk_sleep(struct lxs_ts *ts)
-{
-	struct lxs_ts_chip *chip = &ts->chip;
-
-	t_dev_info(ts->dev, "%s\n", __func__);
-
-	atomic_set(&chip->init, TC_IC_INIT_NEED);
-
-	//1. RST Low
-	lxs_ts_gpio_set_reset(ts, 0);
-
-	lxs_ts_delay(5);
-
-	//2. AVDD off only
-	if (!ts->plat_data->use_pwr_connect)
-		lxs_ts_power_reg_quirk_sleep(ts);
-
-	lxs_ts_delay(5);
-
-	//3. RST High
-	lxs_ts_gpio_set_reset(ts, 1);
-}
-#endif	/* __LXS_QUIRK_SLEEP */
-
-void lxs_ts_power_connect(struct lxs_ts *ts)
-{
-	lxs_ts_power_ctrl(ts, TS_POWER_ON);
-
-	lxs_ts_delay(5);
-
-	lxs_ts_gpio_set_reset(ts, 1);
-}
-
-void lxs_ts_power_disconnect(struct lxs_ts *ts)
-{
-	struct lxs_ts_chip *chip = &ts->chip;
-
-	atomic_set(&chip->init, TC_IC_INIT_NEED);
-
-	lxs_ts_gpio_set_reset(ts, 0);
-
-	lxs_ts_delay(5);
-
-	lxs_ts_power_ctrl(ts, TS_POWER_OFF);
 }
 
 #define __LAYER_BUS__
@@ -565,8 +385,8 @@ int lxs_ts_bus_read(struct lxs_ts *ts, u32 addr, void *data, int size)
 		}
 	}
 
-	if (lxs_ts_is_power_off(ts)) {
-		t_bus_err(ts->dev, "%s: POWER_STATUS: OFF\n", __func__);
+	if (ts->power_enabled == TS_POWER_OFF) {
+		t_bus_err(ts->dev, "%s: POWER_STATUS : OFF\n", __func__);
 		return -EIO;
 	}
 
@@ -629,8 +449,8 @@ int lxs_ts_bus_write(struct lxs_ts *ts, u32 addr, void *data, int size)
 		}
 	}
 
-	if (lxs_ts_is_power_off(ts)) {
-		t_bus_err(ts->dev, "%s: POWER_STATUS: OFF\n", __func__);
+	if (ts->power_enabled == TS_POWER_OFF) {
+		t_bus_err(ts->dev, "%s: POWER_STATUS : OFF\n", __func__);
 		return -EIO;
 	}
 
@@ -699,8 +519,6 @@ static int lxs_ts_bus_alloc(struct lxs_ts *ts)
 	ts->wr_msg.tx_buf = tx_buf;
 	ts->wr_msg.rx_buf = NULL;
 
-	t_dev_info(ts->dev, "bus buffer allocated, 0x%X\n", buf_size);
-
 	return 0;
 }
 
@@ -720,8 +538,6 @@ static struct lxs_ts *lxs_ts_init(struct device *dev, const struct lxs_ts_entry_
 	ts = devm_kzalloc(dev, sizeof(*ts), GFP_KERNEL);
 	if (ts == NULL)
 		return NULL;
-
-	ts->entry_data = entry_data;
 
 	ts->chip_type = entry_data->chip_type;
 
@@ -771,7 +587,7 @@ static struct lxs_ts *lxs_ts_init(struct device *dev, const struct lxs_ts_entry_
 			ts->chip_select = 0;
 			ts->spi_mode = SPI_MODE_0;
 			ts->bits_per_word = 8;
-			ts->max_freq = SPI_SPEED_HZ;
+			ts->max_freq = __CLOCK_MHZ(5);
 
 			ts->bus_tx_hdr_size = SPI_BUS_TX_HDR_SZ;
 			ts->bus_rx_hdr_size = SPI_BUS_RX_HDR_SZ;
@@ -799,9 +615,7 @@ static struct lxs_ts *lxs_ts_init(struct device *dev, const struct lxs_ts_entry_
 	mutex_init(&ts->lock);
 	mutex_init(&ts->bus_lock);
 	mutex_init(&ts->reset_lock);
-#if defined(__LXS_SUPPORT_FW_DD)
-	mutex_init(&ts->fw_dd_lock);
-#endif
+	mutex_init(&ts->pw_lock);
 
 	device_init_wakeup(ts->dev, true);
 
@@ -819,11 +633,6 @@ static void lxs_ts_free(struct device *dev, struct lxs_ts *ts)
 	mutex_destroy(&ts->lock);
 	mutex_destroy(&ts->bus_lock);
 	mutex_destroy(&ts->reset_lock);
-#if defined(__LXS_SUPPORT_FW_DD)
-	mutex_destroy(&ts->fw_dd_lock);
-
-	lxs_ts_fw_dd_clr(ts);
-#endif
 
 	lxs_ts_free_pinctrl(ts);
 
@@ -849,7 +658,7 @@ static int lxs_ts_bus_pm_suspend(struct device *dev)
 
 	ts->state_pm = TS_DEV_PM_SUSPEND;
 
-#if (KERNEL_VERSION(3, 14, 0) <= LINUX_VERSION_CODE)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 	reinit_completion(&ts->resume_done);
 #else
 	ts->resume_done.done = 0;
@@ -881,7 +690,7 @@ static int lxs_ts_bus_pm_resume(struct device *dev)
 
 static const struct dev_pm_ops lxs_ts_bus_pm_ops = {
 	.suspend	= lxs_ts_bus_pm_suspend,
-	.resume		= lxs_ts_bus_pm_resume,
+	.resume 	= lxs_ts_bus_pm_resume,
 };
 #define DEV_BUS_PM_OPS	(&lxs_ts_bus_pm_ops)
 #else	/* !CONFIG_PM_SLEEP */
@@ -953,7 +762,8 @@ static int lxs_ts_i2c_write(struct lxs_ts *ts)
 	return ret;
 }
 
-static int lxs_ts_i2c_probe(struct i2c_client *i2c)
+static int lxs_ts_i2c_probe(struct i2c_client *i2c,
+					const struct i2c_device_id *id)
 {
 	struct lxs_ts_if_driver *if_drv = NULL;
 	struct lxs_ts *ts = NULL;
@@ -999,33 +809,19 @@ out_plat:
 	return ret;
 }
 
-#if (KERNEL_VERSION(6, 1, 1) <= LINUX_VERSION_CODE)
 static void lxs_ts_i2c_remove(struct i2c_client *i2c)
 {
-	struct lxs_ts *ts = dev_get_drvdata(&i2c->dev);
+        struct lxs_ts *ts = dev_get_drvdata(&i2c->dev);
 
-	if (ts == NULL)
-		return;
+        if (ts == NULL)
+                return;
 
-	lxs_ts_remove(ts, 0);
+        lxs_ts_remove(ts, 0);
 
-	lxs_ts_free(&i2c->dev, ts);
+        lxs_ts_free(&i2c->dev, ts);
+
+        return;
 }
-#else
-static int lxs_ts_i2c_remove(struct i2c_client *i2c)
-{
-	struct lxs_ts *ts = dev_get_drvdata(&i2c->dev);
-
-	if (ts == NULL)
-		return 0;
-
-	lxs_ts_remove(ts, 0);
-
-	lxs_ts_free(&i2c->dev, ts);
-
-	return 0;
-}
-#endif
 
 static void lxs_ts_i2c_shutdown(struct i2c_client *i2c)
 {
@@ -1155,8 +951,8 @@ static int lxs_ts_spi_read(struct lxs_ts *ts)
 	x->tx_buf = msg->tx_buf;
 	x->rx_buf = msg->rx_buf;
 	x->len = msg->rx_size;
-	x->bits_per_word = spi->bits_per_word;
-	x->speed_hz = spi->max_speed_hz;
+	x->bits_per_word = spi->bits_per_word,
+	x->speed_hz = spi->max_speed_hz,
 
 	spi_message_add_tail(x, m);
 
@@ -1185,8 +981,8 @@ static int lxs_ts_spi_write(struct lxs_ts *ts)
 
 	x->tx_buf = msg->tx_buf;
 	x->len = msg->tx_size;
-	x->bits_per_word = spi->bits_per_word;
-	x->speed_hz = spi->max_speed_hz;
+	x->bits_per_word = spi->bits_per_word,
+	x->speed_hz = spi->max_speed_hz,
 
 	spi_message_add_tail(x, m);
 
@@ -1221,8 +1017,9 @@ static int lxs_ts_spi_probe(struct spi_device *spi)
 	}
 
 	ret = lxs_ts_spi_init(ts);
-	if (ret)
+	if (ret) {
 		goto out_plat;
+	}
 
 	ts->idx = if_drv->idx;
 
@@ -1245,33 +1042,19 @@ out_plat:
 	return ret;
 }
 
-#if (KERNEL_VERSION(5, 18, 1) <= LINUX_VERSION_CODE)
 static void lxs_ts_spi_remove(struct spi_device *spi)
 {
-	struct lxs_ts *ts = dev_get_drvdata(&spi->dev);
+        struct lxs_ts *ts = dev_get_drvdata(&spi->dev);
 
-	if (ts == NULL)
-		return;
+        if (ts == NULL)
+                return;
 
-	lxs_ts_remove(ts, 0);
+        lxs_ts_remove(ts, 0);
 
-	lxs_ts_free(&spi->dev, ts);
+        lxs_ts_free(&spi->dev, ts);
+
+        return;
 }
-#else
-static int lxs_ts_spi_remove(struct spi_device *spi)
-{
-	struct lxs_ts *ts = dev_get_drvdata(&spi->dev);
-
-	if (ts == NULL)
-		return 0;
-
-	lxs_ts_remove(ts, 0);
-
-	lxs_ts_free(&spi->dev, ts);
-
-	return 0;
-}
-#endif
 
 static void lxs_ts_spi_shutdown(struct spi_device *spi)
 {
@@ -1422,3 +1205,4 @@ void lxs_ts_unregister_driver(struct lxs_ts_if_driver *if_drv)
 		break;
 	}
 }
+

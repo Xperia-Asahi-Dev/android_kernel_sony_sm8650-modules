@@ -9,13 +9,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-/*
- * Copyright 2024 Sony Corporation.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 #include "lxs_ts.h"
 
@@ -92,3 +85,5 @@ MODULE_DESCRIPTION("LXS Touch SW82907 Driver");
 MODULE_VERSION(LXS_DRV_VERSION);
 MODULE_LICENSE("GPL");
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+
+
