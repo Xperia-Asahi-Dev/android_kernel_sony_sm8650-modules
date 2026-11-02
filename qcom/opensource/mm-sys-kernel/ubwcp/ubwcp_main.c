@@ -31,6 +31,7 @@
 #include <linux/set_memory.h>
 #include <linux/range.h>
 #include <linux/qcom_scm.h>
+#include <linux/memremap.h>
 
 MODULE_IMPORT_NS(DMA_BUF);
 
